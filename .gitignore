@@ -1,0 +1,22 @@
+# Maven
+**/target/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### Local Configuration ###
+.env
+
+### .DS_Store ###
+.DS_Store
+
+### Docker ###
+Dockerfile
+.devcontainer.json
+
