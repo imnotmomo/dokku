@@ -6,13 +6,13 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Java CI with Maven
+name: Java Backend Jacoco Coverage Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["**"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["**"]
 
 jobs:
   build:
@@ -28,18 +28,5 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build with Maven
-      working-directory: ./Backend
-      run: mvn -B package --file pom.xml
-
-    - name: Run unit tests
-      working-directory: ./Backend
-      run: mvn clean test
-
-    - name: Run checkstyle
-      working-directory: ./Backend
-      run: mvn checkstyle:check
-    
-    - name: Run PMD
-      working-directory: ./Backend
-      run: mvn pmd:pmd
-
+      working-directory: IndividualProject
+      run: mvn -B test jacoco:report verify
