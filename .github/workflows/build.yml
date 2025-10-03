@@ -28,5 +28,5 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build with Maven
-      working-directory: IndividualProject
+      working-directory: Backend
       run: mvn -B compile --file pom.xml
