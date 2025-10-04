@@ -12,8 +12,7 @@ public class RouteController {
 
   @GetMapping({"/", "/index"})
   public String index() {
-    return "Welcome to the home page! In order to make an API call direct your browser"
-        + "or Postman to an endpoint.";
+    return "Welcome! Try GET /v1/bathrooms/nearby?lat=40.7536&lng=-73.9832&radius=2000";
   }
 
 }
