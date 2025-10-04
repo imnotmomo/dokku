@@ -4,17 +4,22 @@ import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.User;
-import org.springframework.stereotype.Service;
-
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
 
+/**
+ * In-memory mock backing store and logic for the API.
+ */
 @Service
 public class MockApiService {
+
+    private static final String TZ_NY = "America/New_York";
 
     private final Map<Long, Restroom> restrooms = new ConcurrentHashMap<>();
     private final Map<Long, List<Review>> reviewsByRestroom = new ConcurrentHashMap<>();
@@ -25,16 +30,15 @@ public class MockApiService {
     private final AtomicLong reviewSeq = new AtomicLong(1);
     private final AtomicLong proposalSeq = new AtomicLong(1);
 
+    /** Seed initial data. */
     public MockApiService() {
         seed();
     }
 
     private void seed() {
-        // Seed one admin and one user
         createUser("admin@demo", "admin", "ADMIN");
         createUser("user@demo", "user", "USER");
 
-        // Seed restrooms
         Restroom r1 = new Restroom();
         r1.setId(restroomSeq.getAndIncrement());
         r1.setName("Bryant Park Public Restroom");
@@ -44,7 +48,7 @@ public class MockApiService {
         r1.setHours("08:00-18:00");
         r1.setAmenities("wheelchair,family");
         r1.setAvgRating(4.7);
-        r1.setVisitCount(12);
+        r1.setVisitCount(12L);
         restrooms.put(r1.getId(), r1);
 
         Restroom r2 = new Restroom();
@@ -56,28 +60,18 @@ public class MockApiService {
         r2.setHours("07:00-22:00");
         r2.setAmenities("family");
         r2.setAvgRating(4.2);
-        r2.setVisitCount(6);
+        r2.setVisitCount(6L);
         restrooms.put(r2.getId(), r2);
 
-        // Seed a review
-        addReviewInternal(makeReview(r1.getId(),"user@demo",5,5,"Very clean!"));
-    }
-
-    private Review makeReview(Long restroomId, String userId, int rating, int clean, String cmt) {
-        Review rv = new Review();
-        rv.setId(reviewSeq.getAndIncrement());
-        rv.setRestroomId(restroomId);
-        rv.setUserId(userId);
-        rv.setRating(rating);
-        rv.setCleanliness(clean);
-        rv.setComment(cmt);
-        rv.setHelpfulVotes(new Random().nextInt(5));
-        rv.setCreatedAt(Instant.now());
-        return rv;
+        addReviewInternal(makeReview(r1.getId(), "user@demo", 5, 5, "Very clean!"));
     }
 
     // ===== Users/Auth =====
-    public synchronized User createUser(String username, String password, String role) {
+
+    /**
+     * Create a new user (mock).
+     */
+    public synchronized User createUser(final String username, final String password, final String role) {
         if (users.containsKey(username)) {
             throw new IllegalArgumentException("User already exists");
         }
@@ -85,7 +79,6 @@ public class MockApiService {
         u.setUsername(username);
         u.setPassword(password);
         u.setRole(role);
-        // issue tokens
         u.setToken(UUID.randomUUID().toString());
         u.setRefreshToken(UUID.randomUUID().toString());
         users.put(username, u);
@@ -93,12 +86,14 @@ public class MockApiService {
         return sanitize(u);
     }
 
-    public User login(String username, String password) {
+    /**
+     * Login and rotate access token.
+     */
+    public User login(final String username, final String password) {
         User u = users.get(username);
         if (u == null || !Objects.equals(u.getPassword(), password)) {
             throw new IllegalArgumentException("Invalid credentials");
         }
-        // rotate token
         String newToken = UUID.randomUUID().toString();
         tokenToUser.remove(u.getToken());
         u.setToken(newToken);
@@ -106,11 +101,16 @@ public class MockApiService {
         return sanitize(u);
     }
 
-    public User refresh(String refreshToken) {
+    /**
+     * Refresh access token.
+     */
+    public User refresh(final String refreshToken) {
         Optional<User> ou = users.values().stream()
                 .filter(x -> Objects.equals(x.getRefreshToken(), refreshToken))
                 .findFirst();
-        if (ou.isEmpty()) throw new IllegalArgumentException("Invalid refresh token");
+        if (ou.isEmpty()) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
         User u = ou.get();
         String newToken = UUID.randomUUID().toString();
         tokenToUser.remove(u.getToken());
@@ -119,14 +119,21 @@ public class MockApiService {
         return sanitize(u);
     }
 
-    public User getUserFromToken(String token) {
+    /**
+     * Map token to user.
+     */
+    public User getUserFromToken(final String token) {
         String username = tokenToUser.get(token);
-        if (username == null) return null;
+        if (username == null) {
+            return null;
+        }
         return sanitize(users.get(username));
     }
 
-    private User sanitize(User u) {
-        if (u == null) return null;
+    private User sanitize(final User u) {
+        if (u == null) {
+            return null;
+        }
         User s = new User();
         s.setUsername(u.getUsername());
         s.setRole(u.getRole());
@@ -136,18 +143,26 @@ public class MockApiService {
     }
 
     // ===== Restrooms =====
-    public Restroom submitRestroom(Restroom r) {
+
+    /**
+     * Submit a new restroom (mock).
+     */
+    public Restroom submitRestroom(final Restroom r) {
         r.setId(restroomSeq.getAndIncrement());
         r.setAvgRating(0.0);
-        r.setVisitCount(0);
+        r.setVisitCount(0L);
         restrooms.put(r.getId(), r);
         return r;
     }
 
-    public Restroom getRestroom(Long id) {
+    /**
+     * Get restroom by id and update avg rating from reviews.
+     */
+    public Restroom getRestroom(final Long id) {
         Restroom r = restrooms.get(id);
-        if (r == null) throw new NoSuchElementException("Restroom not found");
-        // recompute avg rating
+        if (r == null) {
+            throw new NoSuchElementException("Restroom not found");
+        }
         List<Review> rs = reviewsByRestroom.getOrDefault(id, Collections.emptyList());
         if (!rs.isEmpty()) {
             double avg = rs.stream().mapToInt(Review::getRating).average().orElse(0.0);
@@ -156,23 +171,25 @@ public class MockApiService {
         return r;
     }
 
-    public List<Restroom> getNearby(double lat, double lng, double radiusMeters,
-                                    Boolean openNow, Set<String> amenitiesFilter, Integer limit) {
+    /**
+     * Nearby search with ranking: rating desc, visits desc, distance asc.
+     */
+    public List<Restroom> getNearby(final double lat, final double lng, final double radiusMeters,
+                                    final Boolean openNow, final Set<String> amenitiesFilter,
+                                    final Integer limit) {
         List<Restroom> all = new ArrayList<>(restrooms.values());
-        Instant now = Instant.now();
-        ZonedDateTime znow = ZonedDateTime.ofInstant(now, ZoneId.of("America/New_York"));
+        ZonedDateTime znow = ZonedDateTime.ofInstant(Instant.now(), ZoneId.of(TZ_NY));
 
         List<Restroom> filtered = all.stream()
                 .filter(r -> distanceMeters(lat, lng, r.getLatitude(), r.getLongitude()) <= radiusMeters)
                 .filter(r -> openNow == null || isOpen(r.getHours(), znow.toLocalTime()))
-                .filter(r -> amenitiesFilter == null || amenitiesFilter.isEmpty() ||
-                        hasAllAmenities(r.getAmenities(), amenitiesFilter))
+                .filter(r -> amenitiesFilter == null || amenitiesFilter.isEmpty()
+                        || hasAllAmenities(r.getAmenities(), amenitiesFilter))
                 .sorted(Comparator
-                        // simple "best" ranking: rating (desc), then visits (desc), then distance (asc)
                         .comparing(Restroom::getAvgRating, Comparator.reverseOrder())
                         .thenComparing(Restroom::getVisitCount, Comparator.reverseOrder())
-                        .thenComparing(r -> distanceMeters(lat, lng, r.getLatitude(), r.getLongitude()))
-                ).collect(Collectors.toList());
+                        .thenComparing(r -> distanceMeters(lat, lng, r.getLatitude(), r.getLongitude())))
+                .collect(Collectors.toList());
 
         if (limit != null && limit > 0 && filtered.size() > limit) {
             return filtered.subList(0, limit);
@@ -180,7 +197,10 @@ public class MockApiService {
         return filtered;
     }
 
-    public Map<String, Object> recordVisit(Long id) {
+    /**
+     * Record a visit.
+     */
+    public Map<String, Object> recordVisit(final Long id) {
         Restroom r = getRestroom(id);
         r.setVisitCount(r.getVisitCount() + 1);
         Map<String, Object> resp = new HashMap<>();
@@ -191,7 +211,11 @@ public class MockApiService {
     }
 
     // ===== Edit Proposals =====
-    public EditProposal proposeEdit(Long restroomId, EditProposal p) {
+
+    /**
+     * Propose an edit.
+     */
+    public EditProposal proposeEdit(final Long restroomId, final EditProposal p) {
         Restroom r = getRestroom(restroomId);
         p.setId(proposalSeq.getAndIncrement());
         p.setRestroomId(restroomId);
@@ -202,8 +226,13 @@ public class MockApiService {
     }
 
     // ===== Reviews =====
-    public Review addReview(Long restroomId, String userId, int rating, int cleanliness, String comment) {
-        getRestroom(restroomId); // ensure exists
+
+    /**
+     * Add a review.
+     */
+    public Review addReview(final Long restroomId, final String userId, final int rating,
+                            final int cleanliness, final String comment) {
+        getRestroom(restroomId);
         Review review = new Review();
         review.setId(reviewSeq.getAndIncrement());
         review.setRestroomId(restroomId);
@@ -217,9 +246,8 @@ public class MockApiService {
         return review;
     }
 
-    private void addReviewInternal(Review review) {
+    private void addReviewInternal(final Review review) {
         reviewsByRestroom.computeIfAbsent(review.getRestroomId(), k -> new ArrayList<>()).add(review);
-        // recalc avg
         Restroom r = restrooms.get(review.getRestroomId());
         if (r != null) {
             List<Review> rs = reviewsByRestroom.get(review.getRestroomId());
@@ -228,51 +256,72 @@ public class MockApiService {
         }
     }
 
-    public List<Review> getReviews(Long restroomId, String sort) {
+    /**
+     * Get reviews with sorting.
+     */
+    public List<Review> getReviews(final Long restroomId, final String sort) {
         List<Review> rs = new ArrayList<>(reviewsByRestroom.getOrDefault(restroomId, Collections.emptyList()));
         if ("helpful".equalsIgnoreCase(sort)) {
             rs.sort(Comparator.comparing(Review::getHelpfulVotes).reversed()
                     .thenComparing(Review::getCreatedAt).reversed());
         } else {
-            // default: recent
             rs.sort(Comparator.comparing(Review::getCreatedAt).reversed());
         }
         return rs;
     }
 
     // ===== Helpers =====
-    private boolean hasAllAmenities(String commaSeparated, Set<String> filter) {
-        if (commaSeparated == null || commaSeparated.isBlank()) return false;
+
+    private boolean hasAllAmenities(final String commaSeparated, final Set<String> filter) {
+        if (commaSeparated == null || commaSeparated.isBlank()) {
+            return false;
+        }
         Set<String> have = Arrays.stream(commaSeparated.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet());
         return have.containsAll(filter);
     }
 
-    private boolean isOpen(String hours, LocalTime now) {
-        if (hours == null || hours.isBlank()) return true; // assume open if unknown
+    private boolean isOpen(final String hours, final LocalTime now) {
+        if (hours == null || hours.isBlank()) {
+            return true;
+        }
         try {
             String[] parts = hours.split("-");
             LocalTime open = LocalTime.parse(parts[0], DateTimeFormatter.ofPattern("HH:mm"));
             LocalTime close = LocalTime.parse(parts[1], DateTimeFormatter.ofPattern("HH:mm"));
             if (close.isBefore(open)) {
-                // overnight window (e.g., 22:00-06:00)
                 return !now.isBefore(open) || !now.isAfter(close);
             }
             return !now.isBefore(open) && !now.isAfter(close);
-        } catch (Exception e) {
+        } catch (Exception ex) {
             return true;
         }
     }
 
-    private double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371000.0;
+    private double distanceMeters(final double lat1, final double lon1,
+                                  final double lat2, final double lon2) {
+        double earthRadiusMeters = 6_371_000.0;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat/2)*Math.sin(dLat/2) +
-                Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))*
-                        Math.sin(dLon/2)*Math.sin(dLon/2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusMeters * c;
+    }
+
+    private Review makeReview(final Long restroomId, final String userId, final int rating,
+                              final int cleanliness, final String comment) {
+        Review rv = new Review();
+        rv.setId(reviewSeq.getAndIncrement());
+        rv.setRestroomId(restroomId);
+        rv.setUserId(userId);
+        rv.setRating(rating);
+        rv.setCleanliness(cleanliness);
+        rv.setComment(comment);
+        rv.setHelpfulVotes(ThreadLocalRandom.current().nextInt(5));
+        rv.setCreatedAt(Instant.now());
+        return rv;
     }
 }
