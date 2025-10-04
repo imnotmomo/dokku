@@ -8,46 +8,94 @@ import java.util.List;
  */
 @SuppressWarnings("PMD.DataClass")
 public class Restroom {
-    private Long id;
-    private String name;
-    private String address;
-    private double latitude;
-    private double longitude;
-    private String hours;
-    private String amenities; // comma-separated in mock
-    private double avgRating;
-    private long visitCount;
-    private List<EditProposal> pendingEdits = new ArrayList<>();
+  private Long id;
+  private String name;
+  private String address;
+  private double latitude;
+  private double longitude;
+  private String hours;
+  private String amenities; // comma-separated in mock
+  private double avgRating;
+  private long visitCount;
+  private List<EditProposal> pendingEdits = new ArrayList<>();
 
-    public Long getId() { return id; }
-    public void setId(final Long id) { this.id = id; }
+  public Long getId() {
+    return id;
+  }
 
-    public String getName() { return name; }
-    public void setName(final String name) { this.name = name; }
+  public void setId(final Long id) {
+    this.id = id;
+  }
 
-    public String getAddress() { return address; }
-    public void setAddress(final String address) { this.address = address; }
+  public String getName() {
+    return name;
+  }
 
-    public double getLatitude() { return latitude; }
-    public void setLatitude(final double latitude) { this.latitude = latitude; }
+  public void setName(final String name) {
+    this.name = name;
+  }
 
-    public double getLongitude() { return longitude; }
-    public void setLongitude(final double longitude) { this.longitude = longitude; }
+  public String getAddress() {
+    return address;
+  }
 
-    public String getHours() { return hours; }
-    public void setHours(final String hours) { this.hours = hours; }
+  public void setAddress(final String address) {
+    this.address = address;
+  }
 
-    public String getAmenities() { return amenities; }
-    public void setAmenities(final String amenities) { this.amenities = amenities; }
+  public double getLatitude() {
+    return latitude;
+  }
 
-    public double getAvgRating() { return avgRating; }
-    public void setAvgRating(final double avgRating) { this.avgRating = avgRating; }
+  public void setLatitude(final double latitude) {
+    this.latitude = latitude;
+  }
 
-    public long getVisitCount() { return visitCount; }
-    public void setVisitCount(final long visitCount) { this.visitCount = visitCount; }
+  public double getLongitude() {
+    return longitude;
+  }
 
-    public List<EditProposal> getPendingEdits() { return pendingEdits; }
-    public void setPendingEdits(final List<EditProposal> pendingEdits) {
-        this.pendingEdits = pendingEdits;
-    }
+  public void setLongitude(final double longitude) {
+    this.longitude = longitude;
+  }
+
+  public String getHours() {
+    return hours;
+  }
+
+  public void setHours(final String hours) {
+    this.hours = hours;
+  }
+
+  public String getAmenities() {
+    return amenities;
+  }
+
+  public void setAmenities(final String amenities) {
+    this.amenities = amenities;
+  }
+
+  public double getAvgRating() {
+    return avgRating;
+  }
+
+  public void setAvgRating(final double avgRating) {
+    this.avgRating = avgRating;
+  }
+
+  public long getVisitCount() {
+    return visitCount;
+  }
+
+  public void setVisitCount(final long visitCount) {
+    this.visitCount = visitCount;
+  }
+
+  public List<EditProposal> getPendingEdits() {
+    return pendingEdits;
+  }
+
+  public void setPendingEdits(final List<EditProposal> pendingEdits) {
+    this.pendingEdits = pendingEdits;
+  }
 }

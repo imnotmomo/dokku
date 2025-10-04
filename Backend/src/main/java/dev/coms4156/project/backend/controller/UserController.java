@@ -4,7 +4,9 @@ import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Returns info about the current authenticated user.
@@ -16,6 +18,7 @@ public class UserController {
 
   /**
    * Constructor for DI.
+   *
    * @param svc mock service
    */
   public UserController(final MockApiService svc) {
@@ -24,6 +27,7 @@ public class UserController {
 
   /**
    * Returns the calling user's profile derived from the Bearer token.
+   *
    * @param auth Authorization header
    * @return user or 401
    */

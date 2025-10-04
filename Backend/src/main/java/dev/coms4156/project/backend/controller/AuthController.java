@@ -4,7 +4,10 @@ import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Mock authentication endpoints: signup, login, refresh.
@@ -17,6 +20,7 @@ public class AuthController {
 
   /**
    * Constructor for DI.
+   *
    * @param svc mock service
    */
   public AuthController(final MockApiService svc) {
@@ -25,6 +29,7 @@ public class AuthController {
 
   /**
    * Sign up a new user.
+   *
    * @param body JSON with username, password
    * @return user with tokens
    */
@@ -45,6 +50,7 @@ public class AuthController {
 
   /**
    * Login with credentials.
+   *
    * @param body JSON with username, password
    * @return user with new token
    */
@@ -60,6 +66,7 @@ public class AuthController {
 
   /**
    * Refresh an access token.
+   *
    * @param body JSON with refreshToken
    * @return user with rotated token
    */

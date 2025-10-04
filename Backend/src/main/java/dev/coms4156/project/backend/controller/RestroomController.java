@@ -4,10 +4,22 @@ import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Bathroom endpoints: submit, nearby, details, propose edit, visit.
@@ -20,6 +32,7 @@ public class RestroomController {
 
   /**
    * Constructor for DI.
+   *
    * @param svc mock service
    */
   public RestroomController(final MockApiService svc) {
@@ -28,6 +41,7 @@ public class RestroomController {
 
   /**
    * Submit a new restroom (mock: accepted right away).
+   *
    * @param r restroom
    * @param auth optional auth (ignored here)
    * @return created restroom
@@ -75,7 +89,8 @@ public class RestroomController {
       dto.put("amenities", r.getAmenities());
       dto.put("avg_rating", r.getAvgRating());
       dto.put("visitCount", r.getVisitCount());
-      dto.put("topReviews", svc.getReviews(id, "helpful").stream().limit(3).collect(Collectors.toList()));
+      dto.put("topReviews", svc.getReviews(id, "helpful").stream()
+              .limit(3).collect(Collectors.toList()));
       return ResponseEntity.ok(dto);
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));

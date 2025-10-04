@@ -5,7 +5,14 @@ import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Review endpoints for a restroom.
@@ -18,6 +25,7 @@ public class ReviewController {
 
   /**
    * Constructor for DI.
+   *
    * @param svc mock service
    */
   public ReviewController(final MockApiService svc) {
@@ -58,6 +66,7 @@ public class ReviewController {
 
   /**
    * List reviews for a restroom.
+   *
    * @param id restroom id
    * @param sort recent|helpful
    * @return list of reviews

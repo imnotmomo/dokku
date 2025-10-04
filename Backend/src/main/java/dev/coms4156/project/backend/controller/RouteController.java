@@ -11,6 +11,7 @@ public class RouteController {
 
   /**
    * Returns a short hint about how to try the API.
+   *
    * @return Welcome message
    */
   @GetMapping({"/", "/index"})

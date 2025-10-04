@@ -7,36 +7,76 @@ import java.time.Instant;
  */
 @SuppressWarnings("PMD.DataClass")
 public class Review {
-    private Long id;
-    private Long restroomId;
-    private String userId;
-    private int rating;
-    private int cleanliness;
-    private String comment;
-    private int helpfulVotes;
-    private Instant createdAt;
+  private Long id;
+  private Long restroomId;
+  private String userId;
+  private int rating;
+  private int cleanliness;
+  private String comment;
+  private int helpfulVotes;
+  private Instant createdAt;
 
-    public Long getId() { return id; }
-    public void setId(final Long id) { this.id = id; }
+  public Long getId() {
+    return id;
+  }
 
-    public Long getRestroomId() { return restroomId; }
-    public void setRestroomId(final Long restroomId) { this.restroomId = restroomId; }
+  public void setId(final Long id) {
+    this.id = id;
+  }
 
-    public String getUserId() { return userId; }
-    public void setUserId(final String userId) { this.userId = userId; }
+  public Long getRestroomId() {
+    return restroomId;
+  }
 
-    public int getRating() { return rating; }
-    public void setRating(final int rating) { this.rating = rating; }
+  public void setRestroomId(final Long restroomId) {
+    this.restroomId = restroomId;
+  }
 
-    public int getCleanliness() { return cleanliness; }
-    public void setCleanliness(final int cleanliness) { this.cleanliness = cleanliness; }
+  public String getUserId() {
+    return userId;
+  }
 
-    public String getComment() { return comment; }
-    public void setComment(final String comment) { this.comment = comment; }
+  public void setUserId(final String userId) {
+    this.userId = userId;
+  }
 
-    public int getHelpfulVotes() { return helpfulVotes; }
-    public void setHelpfulVotes(final int helpfulVotes) { this.helpfulVotes = helpfulVotes; }
+  public int getRating() {
+    return rating;
+  }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(final Instant createdAt) { this.createdAt = createdAt; }
+  public void setRating(final int rating) {
+    this.rating = rating;
+  }
+
+  public int getCleanliness() {
+    return cleanliness;
+  }
+
+  public void setCleanliness(final int cleanliness) {
+    this.cleanliness = cleanliness;
+  }
+
+  public String getComment() {
+    return comment;
+  }
+
+  public void setComment(final String comment) {
+    this.comment = comment;
+  }
+
+  public int getHelpfulVotes() {
+    return helpfulVotes;
+  }
+
+  public void setHelpfulVotes(final int helpfulVotes) {
+    this.helpfulVotes = helpfulVotes;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public void setCreatedAt(final Instant createdAt) {
+    this.createdAt = createdAt;
+  }
 }
