@@ -34,6 +34,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/bathrooms")
 public class RestroomController {
 
+  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ERROR_KEY = "error";
+
   private final MockApiService svc;
 
   /**
@@ -61,7 +64,7 @@ public class RestroomController {
       @ApiResponse(responseCode = "400", description = "Invalid request payload")
   })
   @PostMapping
-  @PreAuthorize("hasRole('USER')")
+  @PreAuthorize(ROLE_USER_EXPRESSION)
   public ResponseEntity<Restroom> submit(@RequestBody final Restroom restroom) {
     Restroom toCreate = new Restroom();
     toCreate.setName(restroom.getName());
@@ -119,7 +122,7 @@ public class RestroomController {
               .limit(3).collect(Collectors.toList()));
       return ResponseEntity.ok(dto);
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
@@ -130,7 +133,7 @@ public class RestroomController {
       summary = "Propose restroom edits",
       description = "Submit restroom edit suggestions, need a user token.")
   @PatchMapping("/{id}")
-  @PreAuthorize("hasRole('USER')")
+  @PreAuthorize(ROLE_USER_EXPRESSION)
   public ResponseEntity<?> propose(
       @PathVariable final Long id,
       @RequestBody final EditProposal p,
@@ -140,7 +143,7 @@ public class RestroomController {
       EditProposal created = svc.proposeEdit(id, p);
       return ResponseEntity.status(202).body(created);
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
@@ -159,7 +162,7 @@ public class RestroomController {
     try {
       return ResponseEntity.ok(svc.recordVisit(id));
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 

@@ -14,19 +14,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class UserController {
 
+  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+
   /**
    * Returns the calling user's profile derived from the Bearer token.
    *
    * @return user or 401
    */
   @GetMapping("/v1/me")
-  @PreAuthorize("hasRole('USER')")
+  @PreAuthorize(ROLE_USER_EXPRESSION)
   public ResponseEntity<?> me(
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     String email = principal.getAttribute("email");
     String name = principal.getAttribute("name");
     boolean isAdmin = principal.getAuthorities().stream()
-        .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+        .anyMatch(auth -> "ROLE_ADMIN".equals(auth.getAuthority()));
     Map<String, Object> profile = Map.of(
         "subject", principal.getName(),
         "email", email,

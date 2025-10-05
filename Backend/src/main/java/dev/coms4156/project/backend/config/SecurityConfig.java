@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -41,13 +43,11 @@ public class SecurityConfig {
    * Construct the configuration with a set of admin email addresses.
    */
   public SecurityConfig(@Value("${app.admin.emails:}") final String adminEmailList) {
-    logger.info("Raw admin email list: '{}'", adminEmailList);
     this.adminEmails = Arrays.stream(adminEmailList.split(","))
         .map(String::trim)
         .filter(s -> !s.isEmpty())
-        .map(String::toLowerCase)
+        .map(s -> s.toLowerCase(Locale.ROOT))
         .collect(Collectors.toSet());
-    logger.info("Admin emails configured: {}", this.adminEmails);
   }
 
   /**
@@ -56,7 +56,7 @@ public class SecurityConfig {
   @Bean
   SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
     http
-        .csrf(csrf -> csrf.disable())
+        .csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/", "/index").permitAll()
             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -77,14 +77,22 @@ public class SecurityConfig {
   private AuthenticationFailureHandler authenticationFailureHandler() {
     return (HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) -> {
-      logger.error("OAuth authentication failed: {}", exception.getMessage(), exception);
-      if (exception instanceof OAuth2AuthenticationException) {
-        OAuth2AuthenticationException oauth2Exception = (OAuth2AuthenticationException) exception;
+      if (logger.isErrorEnabled()) {
+        logger.error("OAuth authentication failed: {}", exception.getMessage(), exception);
+      }
+      if (exception instanceof OAuth2AuthenticationException oauth2Exception
+          && logger.isErrorEnabled()) {
         logger.error("OAuth2 Error Code: {}", oauth2Exception.getError().getErrorCode());
         logger.error("OAuth2 Error Description: {}",
             oauth2Exception.getError().getDescription());
       }
-      response.sendRedirect("/login?error=true");
+      try {
+        response.sendRedirect("/login?error=true");
+      } catch (IOException ioe) {
+        if (logger.isErrorEnabled()) {
+          logger.error("Redirect after OAuth failure failed", ioe);
+        }
+      }
     };
   }
 
@@ -98,13 +106,19 @@ public class SecurityConfig {
       Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
       authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
       String email = user.getAttribute("email");
-      logger.info("User logged in with email: {}", email);
-      logger.info("Checking against admin emails: {}", adminEmails);
-      if (email != null && adminEmails.contains(email.toLowerCase())) {
-        logger.info("User {} is an admin, adding ROLE_ADMIN", email);
+      if (logger.isInfoEnabled()) {
+        logger.info("User logged in with email: {}", email);
+        logger.info("Checking against admin emails: {}", adminEmails);
+      }
+      if (email != null && adminEmails.contains(email.toLowerCase(Locale.ROOT))) {
+        if (logger.isInfoEnabled()) {
+          logger.info("User {} is an admin, adding ROLE_ADMIN", email);
+        }
         authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
       } else {
-        logger.info("User {} is NOT an admin", email);
+        if (logger.isInfoEnabled()) {
+          logger.info("User {} is NOT an admin", email);
+        }
       }
       return new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo());
     };

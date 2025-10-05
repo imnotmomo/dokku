@@ -23,6 +23,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/bathrooms/{id}/reviews")
 public class ReviewController {
 
+  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ERROR_KEY = "error";
+
   private final MockApiService svc;
 
   /**
@@ -38,7 +41,7 @@ public class ReviewController {
    * Create a review (auth required).
    */
   @PostMapping
-  @PreAuthorize("hasRole('USER')")
+  @PreAuthorize(ROLE_USER_EXPRESSION)
   public ResponseEntity<?> addReview(
       @PathVariable final Long id,
       @RequestBody final ReviewRequest body,
@@ -46,11 +49,11 @@ public class ReviewController {
     String reviewer = resolveUserIdentifier(principal);
 
     if (body.getRating() == null || body.getCleanliness() == null) {
-      return ResponseEntity.badRequest().body(Map.of("error", "rating and cleanliness required"));
+      return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "rating and cleanliness required"));
     }
     if (body.getRating() < 1 || body.getRating() > 5
         || body.getCleanliness() < 1 || body.getCleanliness() > 5) {
-      return ResponseEntity.badRequest().body(Map.of("error", "rating/cleanliness must be 1-5"));
+      return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "rating/cleanliness must be 1-5"));
     }
 
     try {
@@ -58,7 +61,7 @@ public class ReviewController {
           body.getCleanliness(), body.getComment());
       return ResponseEntity.status(201).body(r);
     } catch (Exception ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
@@ -75,7 +78,7 @@ public class ReviewController {
     try {
       return ResponseEntity.ok(svc.getReviews(id, sort));
     } catch (Exception ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
