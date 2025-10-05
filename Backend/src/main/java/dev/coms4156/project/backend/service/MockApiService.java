@@ -10,7 +10,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -60,7 +59,7 @@ public class MockApiService {
     r1.setLatitude(40.7536);
     r1.setLongitude(-73.9832);
     r1.setHours("08:00-18:00");
-    r1.setAmenities("wheelchair,family");
+    r1.setAmenities(List.of("wheelchair", "family"));
     r1.setAvgRating(4.7);
     r1.setVisitCount(12L);
     restrooms.put(r1.getId(), r1);
@@ -72,7 +71,7 @@ public class MockApiService {
     r2.setLatitude(40.7530);
     r2.setLongitude(-73.9847);
     r2.setHours("07:00-22:00");
-    r2.setAmenities("family");
+    r2.setAmenities(List.of("family"));
     r2.setAvgRating(4.2);
     r2.setVisitCount(6L);
     restrooms.put(r2.getId(), r2);
@@ -290,12 +289,13 @@ public class MockApiService {
 
   // ===== Helpers =====
 
-  private boolean hasAllAmenities(final String commaSeparated, final Set<String> filter) {
-    if (commaSeparated == null || commaSeparated.isBlank()) {
+  private boolean hasAllAmenities(final List<String> amenities, final Set<String> filter) {
+    if (amenities == null || amenities.isEmpty()) {
       return false;
     }
-    Set<String> have = Arrays.stream(commaSeparated.split(","))
-            .map(String::trim).filter(s -> !s.isEmpty())
+    Set<String> have = amenities.stream()
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
             .collect(Collectors.toSet());
     return have.containsAll(filter);
   }
