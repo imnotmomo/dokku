@@ -53,8 +53,7 @@ public class RestroomController {
    */
   @Operation(
       summary = "Submit a new restroom",
-      description = "Creates a restroom from name, address, coordinates, hours, and amenities (list)."
-          + " Remaining fields are populated by the service.")
+      description = "Creates a restroom from the provided basics; other fields are auto-populated.")
   @ApiResponses({
       @ApiResponse(responseCode = "201",
           description = "Restroom created",
