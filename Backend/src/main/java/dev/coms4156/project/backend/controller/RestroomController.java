@@ -2,7 +2,6 @@ package dev.coms4156.project.backend.controller;
 
 import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
-import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,12 +15,14 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/v1/bathrooms")
 public class RestroomController {
+
+  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ERROR_KEY = "error";
 
   private final MockApiService svc;
 
@@ -48,11 +52,10 @@ public class RestroomController {
    * Submit a new restroom (mock: accepted right away).
    *
    * @param restroom minimal restroom payload
-   * @param auth optional auth (ignored here)
    * @return created restroom
    */
   @Operation(
-      summary = "Submit a new restroom",
+      summary = "Submit a new restroom, login required",
       description = "Creates a restroom from the provided basics; other fields are auto-populated.")
   @ApiResponses({
       @ApiResponse(responseCode = "201",
@@ -61,9 +64,8 @@ public class RestroomController {
       @ApiResponse(responseCode = "400", description = "Invalid request payload")
   })
   @PostMapping
-  public ResponseEntity<Restroom> submit(@RequestBody final Restroom restroom,
-                                         @RequestHeader(value = "Authorization", required = false)
-                                         final String auth) {
+  @PreAuthorize(ROLE_USER_EXPRESSION)
+  public ResponseEntity<Restroom> submit(@RequestBody final Restroom restroom) {
     Restroom toCreate = new Restroom();
     toCreate.setName(restroom.getName());
     toCreate.setAddress(restroom.getAddress());
@@ -79,7 +81,7 @@ public class RestroomController {
    * Nearby search with optional filters.
    */
   @Operation(
-      summary = "Find nearby restrooms",
+      summary = "Find nearby restrooms, no login needed",
       description = "Returns restrooms filtered by radius, open status, amenities, and limit.")
   @GetMapping("/nearby")
   public ResponseEntity<?> nearby(@RequestParam final double lat,
@@ -100,7 +102,7 @@ public class RestroomController {
    * Bathroom details with top helpful reviews preview.
    */
   @Operation(
-      summary = "Get restroom details",
+      summary = "Get restroom details, no login needed",
       description = "Fetches metadata and up to three helpful reviews for the restroom identifier.")
   @GetMapping("/{id}")
   public ResponseEntity<?> details(@PathVariable final Long id) {
@@ -120,7 +122,7 @@ public class RestroomController {
               .limit(3).collect(Collectors.toList()));
       return ResponseEntity.ok(dto);
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
@@ -129,22 +131,19 @@ public class RestroomController {
    */
   @Operation(
       summary = "Propose restroom edits",
-      description = "Submits restroom edit suggestions; requires a bearer token.")
+      description = "Submit restroom edit suggestions, need a user token.")
   @PatchMapping("/{id}")
-  public ResponseEntity<?> propose(@PathVariable final Long id,
-                                   @RequestBody final EditProposal p,
-                                   @RequestHeader(value = "Authorization", required = false)
-                                   final String auth) {
-    User u = getUserFromAuthHeader(auth);
-    if (u == null) {
-      return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-    }
+  @PreAuthorize(ROLE_USER_EXPRESSION)
+  public ResponseEntity<?> propose(
+      @PathVariable final Long id,
+      @RequestBody final EditProposal p,
+      @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     try {
-      p.setProposerUserId(u.getUsername());
+      p.setProposerUserId(resolveUserIdentifier(principal));
       EditProposal created = svc.proposeEdit(id, p);
       return ResponseEntity.status(202).body(created);
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
@@ -153,27 +152,28 @@ public class RestroomController {
    */
   @Operation(
       summary = "Record a restroom visit",
-      description = "Increments restroom visit metrics and requires a bearer token for the user.")
+      description = "Increments restroom visit counts, need a user token.")
   @PostMapping("/{id}/visit")
-  public ResponseEntity<?> visit(@PathVariable final Long id,
-                                 @RequestHeader(value = "Authorization", required = false)
-                                 final String auth) {
-    User u = getUserFromAuthHeader(auth);
-    if (u == null) {
-      return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-    }
+  @PreAuthorize("hasRole('USER')")
+  public ResponseEntity<?> visit(
+      @PathVariable final Long id,
+      @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
+    resolveUserIdentifier(principal);
     try {
       return ResponseEntity.ok(svc.recordVisit(id));
     } catch (NoSuchElementException ex) {
-      return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+      return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
   }
 
-  private User getUserFromAuthHeader(final String auth) {
-    if (auth == null || !auth.startsWith("Bearer ")) {
-      return null;
+  private String resolveUserIdentifier(final OAuth2AuthenticatedPrincipal principal) {
+    if (principal == null) {
+      return "anonymous";
     }
-    String token = auth.substring("Bearer ".length()).trim();
-    return svc.getUserFromToken(token);
+    String email = principal.getAttribute("email");
+    if (email != null && !email.isBlank()) {
+      return email;
+    }
+    return principal.getName();
   }
 }

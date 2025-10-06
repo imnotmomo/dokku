@@ -1,9 +1,12 @@
 package dev.coms4156.project.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Restroom DTO for API responses and requests.
@@ -76,6 +79,37 @@ public class Restroom {
 
   public void setAmenities(final List<String> amenities) {
     this.amenities = amenities == null ? new ArrayList<>() : new ArrayList<>(amenities);
+  }
+
+  /**
+   * Support binding amenities from either a JSON array or a comma-separated string.
+   */
+  @JsonSetter("amenities")
+  public void setAmenitiesJson(final Object amenitiesJson) {
+    if (amenitiesJson == null) {
+      setAmenities(null);
+      return;
+    }
+    if (amenitiesJson instanceof List<?> list) {
+      List<String> normalized = list.stream()
+          .map(Object::toString)
+          .map(String::trim)
+          .filter(s -> !s.isEmpty())
+          .collect(Collectors.toList());
+      setAmenities(normalized);
+      return;
+    }
+    if (amenitiesJson instanceof String str) {
+      List<String> normalized = str.isBlank()
+          ? List.of()
+          : Arrays.stream(str.split(","))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .collect(Collectors.toList());
+      setAmenities(normalized);
+      return;
+    }
+    throw new IllegalArgumentException("Unsupported amenities format");
   }
 
   public double getAvgRating() {

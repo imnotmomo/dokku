@@ -20,6 +20,7 @@ public class RouteController {
   public ResponseEntity<String> index() {
     String body = """
         <p>Welcome!</p>
+        <p><a href='/oauth2/authorization/google'>Login with Google to post/update a restroom or review</a></p>
         <p>Try the example query:
           <a href='/v1/bathrooms/nearby?lat=40.7536&amp;lng=-73.9832&amp;radius=2000'>
             GET /v1/bathrooms/nearby?lat=40.7536&amp;lng=-73.9832&amp;radius=2000
