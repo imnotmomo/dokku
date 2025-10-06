@@ -1,12 +1,15 @@
 package dev.coms4156.project.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Restroom DTO for API responses and requests.
  */
 @SuppressWarnings("PMD.DataClass")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Restroom {
   private Long id;
   private String name;
@@ -14,7 +17,7 @@ public class Restroom {
   private double latitude;
   private double longitude;
   private String hours;
-  private String amenities; // comma-separated in mock
+  private List<String> amenities = new ArrayList<>();
   private double avgRating;
   private long visitCount;
   private List<EditProposal> pendingEdits = new ArrayList<>();
@@ -67,12 +70,12 @@ public class Restroom {
     this.hours = hours;
   }
 
-  public String getAmenities() {
-    return amenities;
+  public List<String> getAmenities() {
+    return Collections.unmodifiableList(amenities);
   }
 
-  public void setAmenities(final String amenities) {
-    this.amenities = amenities;
+  public void setAmenities(final List<String> amenities) {
+    this.amenities = amenities == null ? new ArrayList<>() : new ArrayList<>(amenities);
   }
 
   public double getAvgRating() {

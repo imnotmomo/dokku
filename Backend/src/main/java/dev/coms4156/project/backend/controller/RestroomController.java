@@ -4,6 +4,11 @@ import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.model.User;
 import dev.coms4156.project.backend.service.MockApiService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,21 +47,40 @@ public class RestroomController {
   /**
    * Submit a new restroom (mock: accepted right away).
    *
-   * @param r restroom
+   * @param restroom minimal restroom payload
    * @param auth optional auth (ignored here)
    * @return created restroom
    */
+  @Operation(
+      summary = "Submit a new restroom",
+      description = "Creates a restroom from the provided basics; other fields are auto-populated.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "201",
+          description = "Restroom created",
+          content = @Content(schema = @Schema(implementation = Restroom.class))),
+      @ApiResponse(responseCode = "400", description = "Invalid request payload")
+  })
   @PostMapping
-  public ResponseEntity<?> submit(@RequestBody final Restroom r,
-                                  @RequestHeader(value = "Authorization", required = false)
-                                  final String auth) {
-    Restroom saved = svc.submitRestroom(r);
+  public ResponseEntity<Restroom> submit(@RequestBody final Restroom restroom,
+                                         @RequestHeader(value = "Authorization", required = false)
+                                         final String auth) {
+    Restroom toCreate = new Restroom();
+    toCreate.setName(restroom.getName());
+    toCreate.setAddress(restroom.getAddress());
+    toCreate.setLatitude(restroom.getLatitude());
+    toCreate.setLongitude(restroom.getLongitude());
+    toCreate.setHours(restroom.getHours());
+    toCreate.setAmenities(restroom.getAmenities());
+    Restroom saved = svc.submitRestroom(toCreate);
     return ResponseEntity.status(201).body(saved);
   }
 
   /**
    * Nearby search with optional filters.
    */
+  @Operation(
+      summary = "Find nearby restrooms",
+      description = "Returns restrooms filtered by radius, open status, amenities, and limit.")
   @GetMapping("/nearby")
   public ResponseEntity<?> nearby(@RequestParam final double lat,
                                   @RequestParam final double lng,
@@ -75,6 +99,9 @@ public class RestroomController {
   /**
    * Bathroom details with top helpful reviews preview.
    */
+  @Operation(
+      summary = "Get restroom details",
+      description = "Fetches metadata and up to three helpful reviews for the restroom identifier.")
   @GetMapping("/{id}")
   public ResponseEntity<?> details(@PathVariable final Long id) {
     try {
@@ -100,6 +127,9 @@ public class RestroomController {
   /**
    * Propose an edit to a restroom (auth required).
    */
+  @Operation(
+      summary = "Propose restroom edits",
+      description = "Submits restroom edit suggestions; requires a bearer token.")
   @PatchMapping("/{id}")
   public ResponseEntity<?> propose(@PathVariable final Long id,
                                    @RequestBody final EditProposal p,
@@ -121,6 +151,9 @@ public class RestroomController {
   /**
    * Record a user visit (auth required).
    */
+  @Operation(
+      summary = "Record a restroom visit",
+      description = "Increments restroom visit metrics and requires a bearer token for the user.")
   @PostMapping("/{id}/visit")
   public ResponseEntity<?> visit(@PathVariable final Long id,
                                  @RequestHeader(value = "Authorization", required = false)
