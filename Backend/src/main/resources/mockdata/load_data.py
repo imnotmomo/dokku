@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+Load restrooms.json data into PostgreSQL database.
+"""
+
+import json
+import psycopg2
+from psycopg2.extras import execute_values
+import sys
+from pathlib import Path
+import getpass
+
+# Database connection parameters
+DB_PARAMS = {
+    'dbname': 'restroom_finder',
+    'user': 'zhimeiwang',
+    'host': 'localhost',
+    'port': 5432,
+    'password': getpass.getpass('Database password: ') 
+}
+
+def create_tables(cursor):
+    """Create database tables using schema.sql"""
+    try:
+        # Read schema.sql
+        schema_path = Path('../sql/schema.sql')
+        with open(schema_path, 'r') as f:
+            schema_sql = f.read()
+        
+        # Execute schema
+        cursor.execute(schema_sql)
+        print("Tables created successfully")
+        
+    except Exception as e:
+        print(f"Error creating tables: {e}")
+        sys.exit(1)
+
+def load_json_data():
+    """Load data from restrooms.json"""
+    try:
+        json_path = Path('./restrooms.json')
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        print(f"Loaded {len(data)} restrooms from JSON")
+        return data
+    except Exception as e:
+        print(f"Error loading JSON data: {e}")
+        sys.exit(1)
+
+def determine_boolean_fields(restroom):
+    """Determine boolean fields from amenities"""
+    amenities = [a.lower() for a in restroom.get('amenities', [])]
+    return {
+        'is_unisex': any('unisex' in a or 'all gender' in a for a in amenities),
+        'is_accessible': any('accessible' in a for a in amenities),
+        'has_changing_table': any('changing' in a for a in amenities)
+    }
+
+def insert_restrooms(cursor, restrooms):
+    """Insert restrooms into database"""
+    try:
+        # Prepare data for insertion
+        values = []
+        for restroom in restrooms:
+            values.append((
+                restroom['id'],
+                restroom['name'],
+                restroom['latitude'],
+                restroom['longitude'],
+                restroom.get('address'),
+                restroom.get('hours'),
+                restroom.get('amenities', []),  # Pass amenities as a list
+                restroom.get('avgRating', 0.0)
+            ))
+
+        # Insert data using execute_values
+        insert_sql = """
+            INSERT INTO restroom (
+                id, name, latitude, longitude, address,
+                hours, amenities, rating
+            ) VALUES %s
+        """
+        execute_values(cursor, insert_sql, values)
+        print(f"Inserted {len(values)} restrooms into database")
+        
+    except Exception as e:
+        print(f"Error inserting data: {e}")
+        sys.exit(1)
+
+def main():
+    """Main function"""
+    print("Starting data load process...")
+    print(f"Database: {DB_PARAMS['dbname']} on {DB_PARAMS['host']}")
+    
+    try:
+        # Connect to database
+        conn = psycopg2.connect(**DB_PARAMS)
+        conn.autocommit = False
+        cursor = conn.cursor()
+        
+        # Create tables
+        create_tables(cursor)
+        
+        # Load JSON data
+        restrooms = load_json_data()
+        
+        # Insert data
+        insert_restrooms(cursor, restrooms)
+        
+        # Commit transaction
+        conn.commit()
+        print("Data load completed successfully!")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+        sys.exit(1)
+        
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+if __name__ == "__main__":
+    main()
