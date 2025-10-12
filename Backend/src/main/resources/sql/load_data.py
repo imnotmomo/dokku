@@ -23,7 +23,7 @@ def create_tables(cursor):
     """Create database tables using schema.sql"""
     try:
         # Read schema.sql
-        schema_path = Path('../sql/schema.sql')
+        schema_path = Path('./schema.sql')
         with open(schema_path, 'r') as f:
             schema_sql = f.read()
         
@@ -38,7 +38,7 @@ def create_tables(cursor):
 def load_json_data():
     """Load data from restrooms.json"""
     try:
-        json_path = Path('./restrooms.json')
+        json_path = Path('../mockdata/restrooms.json')
         with open(json_path, 'r') as f:
             data = json.load(f)
         print(f"Loaded {len(data)} restrooms from JSON")
@@ -46,15 +46,6 @@ def load_json_data():
     except Exception as e:
         print(f"Error loading JSON data: {e}")
         sys.exit(1)
-
-def determine_boolean_fields(restroom):
-    """Determine boolean fields from amenities"""
-    amenities = [a.lower() for a in restroom.get('amenities', [])]
-    return {
-        'is_unisex': any('unisex' in a or 'all gender' in a for a in amenities),
-        'is_accessible': any('accessible' in a for a in amenities),
-        'has_changing_table': any('changing' in a for a in amenities)
-    }
 
 def insert_restrooms(cursor, restrooms):
     """Insert restrooms into database"""
@@ -70,18 +61,38 @@ def insert_restrooms(cursor, restrooms):
                 restroom.get('address'),
                 restroom.get('hours'),
                 restroom.get('amenities', []),  # Pass amenities as a list
-                restroom.get('avgRating', 0.0)
+                restroom.get('avgRating', 0.0),
+                restroom.get('visitCount', 0)
             ))
 
         # Insert data using execute_values
         insert_sql = """
             INSERT INTO restroom (
                 id, name, latitude, longitude, address,
-                hours, amenities, rating
+                hours, amenities, avg_rating, visit_count
             ) VALUES %s
         """
         execute_values(cursor, insert_sql, values)
         print(f"Inserted {len(values)} restrooms into database")
+        
+    except Exception as e:
+        print(f"Error inserting data: {e}")
+        sys.exit(1)
+
+def insert_users(cursor):
+    """Insert users into database"""
+    try:
+        # Prepare data for insertion
+        users = [ ["zw3099@columbia.edu", "password", "ADMIN", "123", "123"] ]
+
+
+        # Insert data using execute_values
+        insert_sql = """
+            INSERT INTO users (username, password, role, token, refresh_token
+            ) VALUES %s
+        """
+        execute_values(cursor, insert_sql, users)
+        print(f"Inserted {len(users)} users into database")
         
     except Exception as e:
         print(f"Error inserting data: {e}")
@@ -106,6 +117,7 @@ def main():
         
         # Insert data
         insert_restrooms(cursor, restrooms)
+        insert_users(cursor)
         
         # Commit transaction
         conn.commit()

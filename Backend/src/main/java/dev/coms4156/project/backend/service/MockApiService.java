@@ -6,17 +6,12 @@ import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.User;
 
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.DriverManager;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -33,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -42,22 +38,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * In-memory mock backing store and logic for the API.
  */
 @Service
+@Profile("mock")
 public class MockApiService {
 
   private static final String TZ_NY = "America/New_York";
 
-  private final String dbUrl;
-  private final String dbUser;
-  private final String dbPassword;
   private final Map<Long, Restroom> restrooms = new ConcurrentHashMap<>();
 
-  public MockApiService(
-      @Value("${spring.datasource.url}") String dbUrl,
-      @Value("${spring.datasource.username}") String dbUser,
-      @Value("${spring.datasource.password}") String dbPassword) {
-    this.dbUrl = dbUrl;
-    this.dbUser = dbUser;
-    this.dbPassword = dbPassword;
+  public MockApiService() {
     seed();
   }
   private final Map<Long, List<Review>> reviewsByRestroom = new ConcurrentHashMap<>();
@@ -69,73 +57,16 @@ public class MockApiService {
   private final AtomicLong proposalSeq = new AtomicLong(1);
 
 
-  /** Print database connection details for debugging. */
-  private void printDbDetails() {
-    System.out.println("Database URL: " + dbUrl);
-    System.out.println("Database User: " + dbUser);
-    System.out.println("Database Password: " + (dbPassword != null ? "******" : "null"));
-  }
-
   private void seed() {
     createUser("admin@demo", "admin", "ADMIN");
     createUser("user@demo", "user", "USER");
 
-    // Try to load from database first, fall back to JSON
-    if (!loadRestroomsFromDatabase()) {
-      loadRestroomsFromJson();
-    }
+    loadRestroomsFromJson();
 
-    long firstRestroomIdOfExtraRestroom = loadExtraRestroomData();
-
-    // Add some sample reviews
-    if (!restrooms.isEmpty()) {
-      addReviewInternal(makeReview(firstRestroomIdOfExtraRestroom, "user@demo", 5, 5, "Very clean!"));
-    }
+    // additional restroom data is 976 and 977
+    loadExtraRestroomData();
   }
 
-  /**
-   * Try to load data from the sql database
-   * @return if the data is loaded from database
-   */
-  private boolean loadRestroomsFromDatabase() {
-    printDbDetails();
-    try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
-        System.out.println("Connected to PostgreSQL database successfully!");
-        
-        String sql = "SELECT id, name, latitude, longitude, address, hours, rating, amenities FROM restroom";
-        try (PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-        
-            int count = 0;
-            while (rs.next()) {
-                Restroom restroom = new Restroom();
-                restroom.setId(rs.getLong("id"));
-                restroom.setName(rs.getString("name"));
-                restroom.setLatitude(rs.getDouble("latitude"));
-                restroom.setLongitude(rs.getDouble("longitude"));
-                restroom.setAddress(rs.getString("address"));
-                restroom.setHours(rs.getString("hours"));
-                restroom.setAvgRating(rs.getDouble("rating"));
-                restroom.setVisitCount(0L);
-                restroom.setAmenities(Arrays.asList((String[]) rs.getArray("amenities").getArray()));
-                
-                restrooms.put(restroom.getId(), restroom);
-                
-                if (restroom.getId() >= restroomSeq.get()) {
-                    restroomSeq.set(restroom.getId() + 1);
-                }
-                count++;
-            }
-            
-            System.out.println("Loaded " + count + " restrooms from database");
-            return true;
-        }
-    } catch (Exception e) {
-        System.out.println("Database connection failed: " + e.getMessage() + ". Falling back to JSON file.");
-    }
-    
-    return false;
-}
 
    /**
    * Load restrooms from the JSON file in resources.
@@ -165,11 +96,11 @@ public class MockApiService {
   }
 
 
-  private long loadExtraRestroomData() {
-    System.out.println("Loading fallback restroom data...");
+  private void loadExtraRestroomData() {
+    System.out.println("Loading extra restroom data...");
+
     Restroom r1 = new Restroom();
-    long r1Id = restroomSeq.getAndIncrement();
-    r1.setId(r1Id);
+    r1.setId(restroomSeq.getAndIncrement());
     r1.setName("Bryant Park Public Restroom");
     r1.setAddress("476 5th Ave, New York, NY 10018");
     r1.setLatitude(40.7536);
@@ -191,7 +122,8 @@ public class MockApiService {
     r2.setAvgRating(4.2);
     r2.setVisitCount(6L);
     restrooms.put(r2.getId(), r2);
-    return r1Id;
+    
+    addReviewInternal(makeReview(r1.getId(), "user@demo", 5, 5, "Very clean!"));
   }
 
   // ===== Users/Auth =====
