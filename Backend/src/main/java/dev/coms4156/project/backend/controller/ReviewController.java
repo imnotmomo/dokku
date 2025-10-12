@@ -3,13 +3,12 @@ package dev.coms4156.project.backend.controller;
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.ReviewRequest;
 import dev.coms4156.project.backend.service.MockApiService;
-import dev.coms4156.project.backend.service.db.ReviewDbService;
 import dev.coms4156.project.backend.service.db.RestroomDbService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.env.Environment;
+import dev.coms4156.project.backend.service.db.ReviewDbService;
 import java.util.Arrays;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

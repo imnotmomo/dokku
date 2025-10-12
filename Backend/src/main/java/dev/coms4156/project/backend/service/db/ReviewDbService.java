@@ -1,19 +1,18 @@
 package dev.coms4156.project.backend.service.db;
 
 import dev.coms4156.project.backend.model.Review;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.context.annotation.Profile;
-
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Service;
+
 
 /**
  * Database service for Review entity.
@@ -95,6 +94,7 @@ public class ReviewDbService {
   /**
    * Map database row to Review object.
    */
+  @SuppressWarnings("PMD.UnusedFormalParameter")
   private Review mapReview(ResultSet rs, int rowNum) throws SQLException {
     Review review = new Review();
     review.setId(rs.getLong("id"));

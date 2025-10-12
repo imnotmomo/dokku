@@ -1,15 +1,15 @@
 package dev.coms4156.project.backend.service.db;
 
 import dev.coms4156.project.backend.model.User;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.context.annotation.Profile;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
 
 /**
  * Database service for User entity.
@@ -90,6 +90,7 @@ public class UserDbService {
   /**
    * Map database row to User object.
    */
+  @SuppressWarnings("PMD.UnusedFormalParameter")
   private User mapUser(ResultSet rs, int rowNum) throws SQLException {
     User user = new User();
     user.setUsername(rs.getString("username"));

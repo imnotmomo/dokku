@@ -1,19 +1,19 @@
 package dev.coms4156.project.backend.service.db;
 
 import dev.coms4156.project.backend.model.EditProposal;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.context.annotation.Profile;
-
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Service;
+
 
 /**
  * Database service for EditProposal entity.
@@ -95,6 +95,7 @@ public class EditProposalDbService {
   /**
    * Map database row to EditProposal object.
    */
+  @SuppressWarnings("PMD.UnusedFormalParameter")
   private EditProposal mapEditProposal(ResultSet rs, int rowNum) throws SQLException {
     EditProposal proposal = new EditProposal();
     proposal.setId(rs.getLong("id"));

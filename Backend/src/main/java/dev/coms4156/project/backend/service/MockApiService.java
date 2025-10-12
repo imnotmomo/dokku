@@ -1,10 +1,11 @@
 package dev.coms4156.project.backend.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.User;
-
 import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -26,13 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Service;
 
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * In-memory mock backing store and logic for the API.
@@ -48,6 +45,7 @@ public class MockApiService {
   public MockApiService() {
     seed();
   }
+
   private final Map<Long, List<Review>> reviewsByRestroom = new ConcurrentHashMap<>();
   private final Map<String, User> users = new ConcurrentHashMap<>();
   private final Map<String, String> tokenToUser = new ConcurrentHashMap<>();
@@ -68,7 +66,7 @@ public class MockApiService {
   }
 
 
-   /**
+  /**
    * Load restrooms from the JSON file in resources.
    */
   private void loadRestroomsFromJson() {
@@ -91,8 +89,8 @@ public class MockApiService {
         System.out.println("Loaded " + restrooms.size() + " restrooms from JSON file");
       }
     } catch (Exception e) {
-        System.err.println("Error loading restrooms from JSON: " + e.getMessage());
-      }
+      System.err.println("Error loading restrooms from JSON: " + e.getMessage());
+    }
   }
 
 

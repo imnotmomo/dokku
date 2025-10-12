@@ -1,13 +1,6 @@
 package dev.coms4156.project.backend.service.db;
 
 import dev.coms4156.project.backend.model.Restroom;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.context.annotation.Profile;
-
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,6 +8,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Service;
+
+
 
 /**
  * Database service for Restroom entity.
@@ -47,23 +48,27 @@ public class RestroomDbService {
   public List<Restroom> getNearby(double lat, double lng, double radiusMeters, 
                                   Boolean openNow, Set<String> amenitiesFilter, Integer limit) {
     String sql = """
-        SELECT *,
-            (6371000 * acos(
-                cos(radians(?)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(?)) + 
-                sin(radians(?)) * sin(radians(latitude))
-            )) as distance
-        FROM restroom
-        WHERE (6371000 * acos(
-                cos(radians(?)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(?)) + 
-                sin(radians(?)) * sin(radians(latitude))
-            )) <= ?
-        ORDER BY distance ASC
-        LIMIT ?
+      SELECT *,
+          (6371000 * 2 * asin(sqrt(
+              sin(radians((latitude - ?) / 2)) * sin(radians((latitude - ?) / 2)) +
+              cos(radians(?)) * cos(radians(latitude)) *
+              sin(radians((longitude - ?) / 2)) * sin(radians((longitude - ?) / 2))
+          ))) as distance
+      FROM restroom
+      WHERE (6371000 * 2 * asin(sqrt(
+              sin(radians((latitude - ?) / 2)) * sin(radians((latitude - ?) / 2)) +
+              cos(radians(?)) * cos(radians(latitude)) *
+              sin(radians((longitude - ?) / 2)) * sin(radians((longitude - ?) / 2))
+          ))) <= ?
+      ORDER BY distance ASC
+      LIMIT ?
         """;
 
-    return jdbcTemplate.query(sql, this::mapRestroom, lat, lng, lat, lat, lng, lat, radiusMeters, limit != null ? limit : 10);
+    return jdbcTemplate.query(sql, this::mapRestroom, 
+      lat, lat, lat, lng, lng,           // First distance calculation (SELECT)
+      lat, lat, lat, lng, lng,           // Second distance calculation (WHERE)
+      radiusMeters,                      // Radius filter
+      limit != null ? limit : 10);       // Limit
   }
 
   /**
@@ -71,7 +76,8 @@ public class RestroomDbService {
    */
   public Restroom create(Restroom restroom) {
     String sql = """
-        INSERT INTO restroom (name, address, latitude, longitude, hours, amenities, avg_rating, visit_count)
+        INSERT INTO restroom (name, address, latitude, longitude, hours, amenities, 
+        avg_rating, visit_count)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
         """;
@@ -114,6 +120,7 @@ public class RestroomDbService {
   /**
    * Map database row to Restroom object.
    */
+  @SuppressWarnings({"PMD.UnusedFormalParameter"})
   private Restroom mapRestroom(ResultSet rs, int rowNum) throws SQLException {
     Restroom restroom = new Restroom();
     restroom.setId(rs.getLong("id"));

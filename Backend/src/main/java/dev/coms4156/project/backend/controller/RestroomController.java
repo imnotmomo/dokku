@@ -5,22 +5,21 @@ import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.service.MockApiService;
 import dev.coms4156.project.backend.service.db.RestroomDbService;
 import dev.coms4156.project.backend.service.db.ReviewDbService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.env.Environment;
-import java.time.Instant;
-import java.util.HashMap;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -131,7 +130,8 @@ public class RestroomController {
   @GetMapping("/{id}")
   public ResponseEntity<?> details(@PathVariable final Long id) {
     try {
-      Restroom r = useMock ? mockService.getRestroom(id) : dbService.getById(id).orElseThrow(() -> new NoSuchElementException("Restroom not found"));
+      Restroom r = useMock ? mockService.getRestroom(id) : 
+          dbService.getById(id).orElseThrow(() -> new NoSuchElementException("Restroom not found"));
       Map<String, Object> dto = new LinkedHashMap<>();
       dto.put("id", r.getId());
       dto.put("name", r.getName());
@@ -144,7 +144,8 @@ public class RestroomController {
       dto.put("visitCount", r.getVisitCount());
       dto.put("topReviews", useMock 
               ? mockService.getReviews(id, "helpful").stream().limit(3).collect(Collectors.toList())
-              : reviewDbService.getByRestroomId(id, "helpful").stream().limit(3).collect(Collectors.toList()));
+              : reviewDbService.getByRestroomId(id, "helpful").stream().limit(3).collect(Collectors
+                .toList()));
       return ResponseEntity.ok(dto);
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
