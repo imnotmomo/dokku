@@ -1,9 +1,12 @@
 package dev.coms4156.project.backend.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.User;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -24,17 +27,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+
 
 /**
  * In-memory mock backing store and logic for the API.
  */
 @Service
+@Profile("mock")
 public class MockApiService {
 
   private static final String TZ_NY = "America/New_York";
 
   private final Map<Long, Restroom> restrooms = new ConcurrentHashMap<>();
+
+  public MockApiService() {
+    seed();
+  }
+
   private final Map<Long, List<Review>> reviewsByRestroom = new ConcurrentHashMap<>();
   private final Map<String, User> users = new ConcurrentHashMap<>();
   private final Map<String, String> tokenToUser = new ConcurrentHashMap<>();
@@ -43,14 +54,48 @@ public class MockApiService {
   private final AtomicLong reviewSeq = new AtomicLong(1);
   private final AtomicLong proposalSeq = new AtomicLong(1);
 
-  /** Seed initial data. */
-  public MockApiService() {
-    seed();
-  }
 
   private void seed() {
     createUser("admin@demo", "admin", "ADMIN");
     createUser("user@demo", "user", "USER");
+
+    loadRestroomsFromJson();
+
+    // additional restroom data is 976 and 977
+    loadExtraRestroomData();
+  }
+
+
+  /**
+   * Load restrooms from the JSON file in resources.
+   */
+  private void loadRestroomsFromJson() {
+    try (InputStream is = Thread.currentThread().getContextClassLoader()
+        .getResourceAsStream("mockdata/restrooms.json")) {
+      if (is == null) {
+        System.err.println("Failed to find mockdata/restrooms.json in resources.");
+      } else {
+        ObjectMapper mapper = new ObjectMapper();
+        List<Restroom> restroomsList = mapper.readValue(is, new TypeReference<List<Restroom>>(){});
+        // Convert list to map and update sequence counter
+        for (Restroom restroom : restroomsList) {
+          restrooms.put(restroom.getId(), restroom);
+
+          if (restroom.getId() >= restroomSeq.get()) {
+            restroomSeq.set(restroom.getId() + 1);
+          }
+        }
+        
+        System.out.println("Loaded " + restrooms.size() + " restrooms from JSON file");
+      }
+    } catch (Exception e) {
+      System.err.println("Error loading restrooms from JSON: " + e.getMessage());
+    }
+  }
+
+
+  private void loadExtraRestroomData() {
+    System.out.println("Loading extra restroom data...");
 
     Restroom r1 = new Restroom();
     r1.setId(restroomSeq.getAndIncrement());
@@ -75,7 +120,7 @@ public class MockApiService {
     r2.setAvgRating(4.2);
     r2.setVisitCount(6L);
     restrooms.put(r2.getId(), r2);
-
+    
     addReviewInternal(makeReview(r1.getId(), "user@demo", 5, 5, "Very clean!"));
   }
 

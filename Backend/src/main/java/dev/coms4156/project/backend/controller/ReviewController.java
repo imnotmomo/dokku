@@ -3,7 +3,12 @@ package dev.coms4156.project.backend.controller;
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.ReviewRequest;
 import dev.coms4156.project.backend.service.MockApiService;
+import dev.coms4156.project.backend.service.db.RestroomDbService;
+import dev.coms4156.project.backend.service.db.ReviewDbService;
+import java.util.Arrays;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,15 +31,28 @@ public class ReviewController {
   private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
   private static final String ERROR_KEY = "error";
 
-  private final MockApiService svc;
+  private final MockApiService mockService;
+  private final ReviewDbService reviewDbService;
+  private final RestroomDbService restroomDbService;
+  private final boolean useMock;
 
   /**
    * Constructor for DI.
    *
-   * @param svc mock service
+   * @param mockService mock service implementation (optional)
+   * @param reviewDbService review database service
+   * @param restroomDbService restroom database service
+   * @param env Spring environment to check active profile
    */
-  public ReviewController(final MockApiService svc) {
-    this.svc = svc;
+  public ReviewController(
+      @Autowired(required = false) final MockApiService mockService,
+      @Autowired(required = false) final ReviewDbService reviewDbService,
+      @Autowired(required = false) final RestroomDbService restroomDbService,
+      final Environment env) {
+    this.mockService = mockService;
+    this.reviewDbService = reviewDbService;
+    this.restroomDbService = restroomDbService;
+    this.useMock = mockService != null && Arrays.asList(env.getActiveProfiles()).contains("mock");
   }
 
   /**
@@ -57,8 +75,21 @@ public class ReviewController {
     }
 
     try {
-      Review r = svc.addReview(id, reviewer, body.getRating(),
-          body.getCleanliness(), body.getComment());
+      Review r;
+      if (useMock) {
+        r = mockService.addReview(id, reviewer, body.getRating(),
+            body.getCleanliness(), body.getComment());
+      } else {
+        // Create review using database service
+        Review review = new Review();
+        review.setRestroomId(id);
+        review.setUserId(reviewer);
+        review.setRating(body.getRating());
+        review.setCleanliness(body.getCleanliness());
+        review.setComment(body.getComment());
+        review.setHelpfulVotes(0);
+        r = reviewDbService.create(review);
+      }
       return ResponseEntity.status(201).body(r);
     } catch (Exception ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
@@ -76,7 +107,11 @@ public class ReviewController {
   public ResponseEntity<?> list(@PathVariable final Long id,
                                 @RequestParam(defaultValue = "recent") final String sort) {
     try {
-      return ResponseEntity.ok(svc.getReviews(id, sort));
+      if (useMock) {
+        return ResponseEntity.ok(mockService.getReviews(id, sort));
+      } else {
+        return ResponseEntity.ok(reviewDbService.getByRestroomId(id, sort));
+      }
     } catch (Exception ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }

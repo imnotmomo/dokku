@@ -3,17 +3,23 @@ package dev.coms4156.project.backend.controller;
 import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.service.MockApiService;
+import dev.coms4156.project.backend.service.db.RestroomDbService;
+import dev.coms4156.project.backend.service.db.ReviewDbService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,15 +43,28 @@ public class RestroomController {
   private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
   private static final String ERROR_KEY = "error";
 
-  private final MockApiService svc;
+  private final MockApiService mockService;
+  private final RestroomDbService dbService;
+  private final ReviewDbService reviewDbService;
+  private final boolean useMock;
 
   /**
    * Constructor for DI.
    *
-   * @param svc mock service
+   * @param mockService mock service implementation (optional)
+   * @param dbService database service implementation
+   * @param reviewDbService review database service for getting top reviews
+   * @param env Spring environment to check active profile
    */
-  public RestroomController(final MockApiService svc) {
-    this.svc = svc;
+  public RestroomController(
+      @Autowired(required = false) final MockApiService mockService,
+      @Autowired(required = false) final RestroomDbService dbService,
+      @Autowired(required = false) final ReviewDbService reviewDbService,
+      final Environment env) {
+    this.mockService = mockService;
+    this.dbService = dbService;
+    this.reviewDbService = reviewDbService;
+    this.useMock = mockService != null && Arrays.asList(env.getActiveProfiles()).contains("mock");
   }
 
   /**
@@ -73,7 +92,7 @@ public class RestroomController {
     toCreate.setLongitude(restroom.getLongitude());
     toCreate.setHours(restroom.getHours());
     toCreate.setAmenities(restroom.getAmenities());
-    Restroom saved = svc.submitRestroom(toCreate);
+    Restroom saved = useMock ? mockService.submitRestroom(toCreate) : dbService.create(toCreate);
     return ResponseEntity.status(201).body(saved);
   }
 
@@ -95,7 +114,11 @@ public class RestroomController {
       amSet = Arrays.stream(amenities.split(","))
               .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
     }
-    return ResponseEntity.ok(svc.getNearby(lat, lng, radius, openNow, amSet, limit));
+    if (useMock) {
+      return ResponseEntity.ok(mockService.getNearby(lat, lng, radius, openNow, amSet, limit));
+    } else {
+      return ResponseEntity.ok(dbService.getNearby(lat, lng, radius, openNow, amSet, limit));
+    }
   }
 
   /**
@@ -107,7 +130,8 @@ public class RestroomController {
   @GetMapping("/{id}")
   public ResponseEntity<?> details(@PathVariable final Long id) {
     try {
-      Restroom r = svc.getRestroom(id);
+      Restroom r = useMock ? mockService.getRestroom(id) : 
+          dbService.getById(id).orElseThrow(() -> new NoSuchElementException("Restroom not found"));
       Map<String, Object> dto = new LinkedHashMap<>();
       dto.put("id", r.getId());
       dto.put("name", r.getName());
@@ -118,8 +142,10 @@ public class RestroomController {
       dto.put("amenities", r.getAmenities());
       dto.put("avg_rating", r.getAvgRating());
       dto.put("visitCount", r.getVisitCount());
-      dto.put("topReviews", svc.getReviews(id, "helpful").stream()
-              .limit(3).collect(Collectors.toList()));
+      dto.put("topReviews", useMock 
+              ? mockService.getReviews(id, "helpful").stream().limit(3).collect(Collectors.toList())
+              : reviewDbService.getByRestroomId(id, "helpful").stream().limit(3).collect(Collectors
+                .toList()));
       return ResponseEntity.ok(dto);
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
@@ -140,7 +166,7 @@ public class RestroomController {
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     try {
       p.setProposerUserId(resolveUserIdentifier(principal));
-      EditProposal created = svc.proposeEdit(id, p);
+      EditProposal created = useMock ? mockService.proposeEdit(id, p) : null;
       return ResponseEntity.status(202).body(created);
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
@@ -160,7 +186,16 @@ public class RestroomController {
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     resolveUserIdentifier(principal);
     try {
-      return ResponseEntity.ok(svc.recordVisit(id));
+      if (useMock) {
+        return ResponseEntity.ok(mockService.recordVisit(id));
+      } else {
+        dbService.incrementVisitCount(id);
+        Map<String, Object> response = new HashMap<>();
+        response.put("restroomId", id);
+        response.put("visitCount", dbService.getById(id).map(Restroom::getVisitCount).orElse(0L));
+        response.put("visitedAt", Instant.now().toString());
+        return ResponseEntity.ok(response);
+      }
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
