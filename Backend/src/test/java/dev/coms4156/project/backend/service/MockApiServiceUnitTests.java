@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.coms4156.project.backend.model.EditProposal;
+import dev.coms4156.project.backend.model.Restroom;
+import dev.coms4156.project.backend.model.Review;
+import dev.coms4156.project.backend.model.User;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
