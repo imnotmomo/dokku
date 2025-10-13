@@ -2,7 +2,9 @@ package dev.coms4156.project.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -186,7 +188,7 @@ public class MockApiServiceUnitTests {
   @Test
   public void shouldFilterByRadius() {
     //very small radius should return fewer results
-    List<Restroom> nearby = service.getNearby(40.7536, -73.9832,
+    List<Restroom> nearbySmall = service.getNearby(40.7536, -73.9832,
         2000.0, null, null, null);
     List<Restroom> nearbyLarge = service.getNearby(40.7536, -73.9832,
         2000.0, null, null, null);
@@ -198,10 +200,10 @@ public class MockApiServiceUnitTests {
   public void shouldFilterByAmenities() {
     Set<String> wheelchairFilter = Set.of("wheelchair");
     List<Restroom> nearby = service.getNearby(40.7536, -73.9832,
-        2000.0, null, null, null);
+        2000.0, null, wheelchairFilter, null);
 
     //all returned restrooms should have wheelchair amenity
-    for (Restroom restroom : filtered) {
+    for (Restroom restroom : nearby) {
       assertTrue(restroom.getAmenities().contains("wheelchair"));
     }
   }
@@ -334,8 +336,6 @@ public class MockApiServiceUnitTests {
 
     Restroom restroom = service.getRestroom(1L);
     assertFalse(restroom.getPendingEdits().isEmpty());
-    assertTrue(reviews.get(i).getHelpfulVotes()
-        >= reviews.get(i + 1).getHelpfulVotes());
   }
 
 
@@ -368,10 +368,8 @@ public class MockApiServiceUnitTests {
   public void shouldFilterAmenitiesCorrectly() {
     //test hasAllAmenities indirectly through getNearby
     Set<String> nonExistentAmenity = Set.of("non-existent-amenity");
-    assertEquals("Updated Name",
-        restroom.getPendingEdits()
-        .get(restroom.getPendingEdits().size() - 1)
-        .getProposedName());
+    List<Restroom> filtered = service.getNearby(40.7536, -73.9832,
+        2000.0, null, nonExistentAmenity, null);
 
     //should return empty or very few results
     assertTrue(filtered.isEmpty() || filtered.size() < 2);
