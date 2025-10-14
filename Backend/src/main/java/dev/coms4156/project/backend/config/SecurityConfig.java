@@ -12,8 +12,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,15 +23,17 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import jakarta.servlet.http.HttpSession;
 
 /**
  * Security configuration enabling Google OAuth2 login and securing write operations.
@@ -43,13 +43,11 @@ import jakarta.servlet.http.HttpSession;
 public class SecurityConfig {
 
   private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
-  public static final String SESSION_COMPANY_ID = "companyLogin.companyId";
   private final Set<String> adminEmails;
   private final UserDbService userDbService;
+  private final HttpSessionOAuth2AuthorizationRequestRepository authorizationRequestRepository =
+      new HttpSessionOAuth2AuthorizationRequestRepository();
 
-  /**
-   * Construct the configuration with a set of admin email addresses.
-   */
   public SecurityConfig(@Value("${app.admin.emails:}") final String adminEmailList,
                         final UserDbService userDbService) {
     this.adminEmails = Arrays.stream(adminEmailList.split(","))
@@ -60,11 +58,16 @@ public class SecurityConfig {
     this.userDbService = userDbService;
   }
 
-  /**
-   * Configure HTTP security rules and OAuth2 login for Google-authenticated users.
-   */
   @Bean
-  SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
+  SecurityFilterChain securityFilterChain(final HttpSecurity http,
+      final ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+    CompanyAwareOAuth2AuthorizationRequestResolver resolver =
+        new CompanyAwareOAuth2AuthorizationRequestResolver(clientRegistrationRepository);
+    CompanyAwareAuthenticationSuccessHandler successHandler =
+        new CompanyAwareAuthenticationSuccessHandler(userDbService, authorizationRequestRepository);
+    successHandler.setDefaultTargetUrl("/");
+    successHandler.setAlwaysUseDefaultTargetUrl(true);
+
     http
         .csrf(AbstractHttpConfigurer::disable)
         .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
@@ -77,16 +80,16 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/v1/companies/**").permitAll()
             .anyRequest().authenticated())
         .oauth2Login(oauth -> oauth
+            .authorizationEndpoint(auth -> auth
+                .authorizationRequestRepository(authorizationRequestRepository)
+                .authorizationRequestResolver(resolver))
             .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserService()))
-            .defaultSuccessUrl("/", true)
+            .successHandler(successHandler)
             .failureHandler(authenticationFailureHandler()))
         .logout(logout -> logout.logoutSuccessUrl("/").permitAll());
     return http.build();
   }
 
-  /**
-   * Custom failure handler to log OAuth errors.
-   */
   private AuthenticationFailureHandler authenticationFailureHandler() {
     return (HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) -> {
@@ -109,9 +112,6 @@ public class SecurityConfig {
     };
   }
 
-  /**
-   * Loads the Google user profile, persists it, and assigns roles from the database.
-   */
   private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
     OidcUserService delegate = new OidcUserService();
     return request -> {
@@ -123,17 +123,14 @@ public class SecurityConfig {
       String email = user.getAttribute("email");
       String displayName = user.getAttribute("name");
       String pictureUrl = user.getAttribute("picture");
-      Long companyId = extractPendingCompanySelection();
-      userDbService.upsertUser(subject, email, displayName, pictureUrl, companyId);
+      userDbService.upsertUser(subject, email, displayName, pictureUrl);
 
       Set<String> storedRoles = userDbService.getRoles(subject);
       Set<String> effectiveRoles = new LinkedHashSet<>(storedRoles);
       if (!effectiveRoles.contains("USER")) {
         effectiveRoles.add("USER");
       }
-      if (companyId != null) {
-        effectiveRoles.add("COMPANY");
-      }
+      userDbService.findCompanyId(subject).ifPresent(id -> effectiveRoles.add("COMPANY"));
       if (logger.isInfoEnabled()) {
         logger.info("User logged in with email: {}", email);
         logger.info("Checking against admin emails: {}", adminEmails);
@@ -154,29 +151,5 @@ public class SecurityConfig {
       }
       return new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo());
     };
-  }
-
-  private Long extractPendingCompanySelection() {
-    ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-    if (attrs == null) {
-      return null;
-    }
-    HttpSession session = attrs.getRequest().getSession(false);
-    if (session == null) {
-      return null;
-    }
-    Object value = session.getAttribute(SESSION_COMPANY_ID);
-    session.removeAttribute(SESSION_COMPANY_ID);
-    if (value instanceof Long l) {
-      return l;
-    }
-    if (value instanceof String s) {
-      try {
-        return Long.parseLong(s);
-      } catch (NumberFormatException ex) {
-        return null;
-      }
-    }
-    return null;
   }
 }

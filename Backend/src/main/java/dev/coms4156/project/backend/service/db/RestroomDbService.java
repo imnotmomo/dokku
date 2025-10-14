@@ -1,10 +1,10 @@
 package dev.coms4156.project.backend.service.db;
 
 import dev.coms4156.project.backend.model.Restroom;
+import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -23,10 +23,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class RestroomDbService {
   private final JdbcTemplate jdbcTemplate;
+  private final CompanyDbService companyDbService;
 
   @Autowired
-  public RestroomDbService(JdbcTemplate jdbcTemplate) {
+  public RestroomDbService(JdbcTemplate jdbcTemplate, CompanyDbService companyDbService) {
     this.jdbcTemplate = jdbcTemplate;
+    this.companyDbService = companyDbService;
   }
 
   /**
@@ -108,6 +110,11 @@ public class RestroomDbService {
     }, keyHolder);
 
     restroom.setId(keyHolder.getKey().longValue());
+    if (restroom.getCompanyId() != null) {
+      companyDbService.findById(restroom.getCompanyId())
+          .map(company -> company.getName())
+          .ifPresent(restroom::setCompanyName);
+    }
     return restroom;
   }
 

@@ -13,6 +13,7 @@ public class User {
   private String email;
   private String displayName;
   private String pictureUrl;
+  private Long companyId;
   private Instant lastLoginAt;
   private Instant createdAt;
   private Instant updatedAt;
@@ -48,6 +49,14 @@ public class User {
 
   public void setPictureUrl(final String pictureUrl) {
     this.pictureUrl = pictureUrl;
+  }
+
+  public Long getCompanyId() {
+    return companyId;
+  }
+
+  public void setCompanyId(final Long companyId) {
+    this.companyId = companyId;
   }
 
   public Instant getLastLoginAt() {
