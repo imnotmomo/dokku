@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Service;
  * Database service for Review entity.
  */
 @Service
-@Profile("!mock")
 public class ReviewDbService {
   private final JdbcTemplate jdbcTemplate;
   private final RestroomDbService restroomDbService;

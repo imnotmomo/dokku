@@ -8,7 +8,6 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
  * Database service for EditProposal entity.
  */
 @Service
-@Profile("!mock")
 public class EditProposalDbService {
   private final JdbcTemplate jdbcTemplate;
 

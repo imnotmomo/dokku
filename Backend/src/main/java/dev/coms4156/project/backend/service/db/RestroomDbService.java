@@ -4,12 +4,12 @@ import dev.coms4156.project.backend.model.Restroom;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
  * Database service for Restroom entity.
  */
 @Service
-@Profile("!mock")
 public class RestroomDbService {
   private final JdbcTemplate jdbcTemplate;
 
@@ -34,7 +33,12 @@ public class RestroomDbService {
    * Get restroom by ID.
    */
   public Optional<Restroom> getById(Long id) {
-    String sql = "SELECT * FROM restroom WHERE id = ?";
+    String sql = """
+        SELECT r.*, c.name AS company_name
+          FROM restroom r
+          LEFT JOIN company c ON c.id = r.company_id
+         WHERE r.id = ?
+        """;
     try {
       return Optional.of(jdbcTemplate.queryForObject(sql, this::mapRestroom, id));
     } catch (Exception e) {
@@ -48,17 +52,18 @@ public class RestroomDbService {
   public List<Restroom> getNearby(double lat, double lng, double radiusMeters, 
                                   Boolean openNow, Set<String> amenitiesFilter, Integer limit) {
     String sql = """
-      SELECT *,
+      SELECT r.*, c.name AS company_name,
           (6371000 * 2 * asin(sqrt(
-              sin(radians((latitude - ?) / 2)) * sin(radians((latitude - ?) / 2)) +
-              cos(radians(?)) * cos(radians(latitude)) *
-              sin(radians((longitude - ?) / 2)) * sin(radians((longitude - ?) / 2))
+              sin(radians((r.latitude - ?) / 2)) * sin(radians((r.latitude - ?) / 2)) +
+              cos(radians(?)) * cos(radians(r.latitude)) *
+              sin(radians((r.longitude - ?) / 2)) * sin(radians((r.longitude - ?) / 2))
           ))) as distance
-      FROM restroom
+      FROM restroom r
+      LEFT JOIN company c ON c.id = r.company_id
       WHERE (6371000 * 2 * asin(sqrt(
-              sin(radians((latitude - ?) / 2)) * sin(radians((latitude - ?) / 2)) +
-              cos(radians(?)) * cos(radians(latitude)) *
-              sin(radians((longitude - ?) / 2)) * sin(radians((longitude - ?) / 2))
+              sin(radians((r.latitude - ?) / 2)) * sin(radians((r.latitude - ?) / 2)) +
+              cos(radians(?)) * cos(radians(r.latitude)) *
+              sin(radians((r.longitude - ?) / 2)) * sin(radians((r.longitude - ?) / 2))
           ))) <= ?
       ORDER BY distance ASC
       LIMIT ?
@@ -76,9 +81,9 @@ public class RestroomDbService {
    */
   public Restroom create(Restroom restroom) {
     String sql = """
-        INSERT INTO restroom (name, address, latitude, longitude, hours, amenities, 
+        INSERT INTO restroom (name, address, latitude, longitude, company_id, hours_json, amenities, 
         avg_rating, visit_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
         """;
 
@@ -89,11 +94,16 @@ public class RestroomDbService {
       ps.setString(2, restroom.getAddress());
       ps.setDouble(3, restroom.getLatitude());
       ps.setDouble(4, restroom.getLongitude());
-      ps.setString(5, restroom.getHours());
-      ps.setArray(6, connection.createArrayOf("text",
+      if (restroom.getCompanyId() != null) {
+        ps.setLong(5, restroom.getCompanyId());
+      } else {
+        ps.setNull(5, java.sql.Types.BIGINT);
+      }
+      ps.setString(6, restroom.getHoursJson());
+      ps.setArray(7, connection.createArrayOf("text",
           restroom.getAmenities().toArray(new String[0])));
-      ps.setDouble(7, restroom.getAvgRating());
-      ps.setLong(8, restroom.getVisitCount());
+      ps.setDouble(8, restroom.getAvgRating());
+      ps.setLong(9, restroom.getVisitCount());
       return ps;
     }, keyHolder);
 
@@ -128,8 +138,28 @@ public class RestroomDbService {
     restroom.setAddress(rs.getString("address"));
     restroom.setLatitude(rs.getDouble("latitude"));
     restroom.setLongitude(rs.getDouble("longitude"));
-    restroom.setHours(rs.getString("hours"));
-    restroom.setAmenities(Arrays.asList((String[]) rs.getArray("amenities").getArray()));
+    long companyId = rs.getLong("company_id");
+    if (!rs.wasNull()) {
+      restroom.setCompanyId(companyId);
+    }
+    restroom.setCompanyName(rs.getString("company_name"));
+    restroom.setHoursJson(rs.getString("hours_json"));
+    Array amenitiesArray = rs.getArray("amenities");
+    if (amenitiesArray != null) {
+      Object arrayObject = amenitiesArray.getArray();
+      if (arrayObject instanceof String[] strings) {
+        restroom.setAmenities(Arrays.asList(strings));
+      } else if (arrayObject instanceof Object[] objects) {
+        restroom.setAmenities(Arrays.stream(objects)
+            .filter(obj -> obj != null)
+            .map(Object::toString)
+            .toList());
+      } else {
+        restroom.setAmenities(List.of());
+      }
+    } else {
+      restroom.setAmenities(List.of());
+    }
     restroom.setAvgRating(rs.getDouble("avg_rating"));
     restroom.setVisitCount(rs.getLong("visit_count"));
     return restroom;

@@ -26,6 +26,7 @@ public class RouteController {
             GET /v1/bathrooms/nearby?lat=40.7536&amp;lng=-73.9832&amp;radius=2000
           </a>
         </p>
+        <p>If you're running with the <code>h2</code> profile, open the <a href='/h2-console'>H2 console</a> to inspect the in-memory database.</p>
         <p>or visit <a href='/swagger-ui/index.html'>Swagger UI</a></p>
         """;
     return ResponseEntity.ok()
