@@ -34,7 +34,8 @@ public class UserDbService {
   public void upsertUser(String subject,
                          String email,
                          String displayName,
-                         String pictureUrl) {
+                         String pictureUrl,
+                         Long companyId) {
     if (subject == null || subject.isBlank()) {
       throw new IllegalArgumentException("subject must not be blank");
     }
@@ -43,6 +44,7 @@ public class UserDbService {
            SET email = ?,
                display_name = ?,
                picture_url = ?,
+               company_id = COALESCE(?, company_id),
                last_login_at = CURRENT_TIMESTAMP,
                updated_at = CURRENT_TIMESTAMP
          WHERE subject = ?
@@ -50,16 +52,18 @@ public class UserDbService {
         email,
         displayName,
         pictureUrl,
+        companyId,
         subject);
     if (updated == 0) {
       jdbcTemplate.update("""
-          INSERT INTO users (subject, email, display_name, picture_url, last_login_at)
-          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          INSERT INTO users (subject, email, display_name, picture_url, company_id, last_login_at)
+          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
           """,
           subject,
           email,
           displayName,
-          pictureUrl);
+          pictureUrl,
+          companyId);
     }
   }
 
@@ -100,7 +104,7 @@ public class UserDbService {
    */
   public Optional<User> findBySubject(String subject) {
     String sql = """
-        SELECT subject, email, display_name, picture_url,
+        SELECT subject, email, display_name, picture_url, company_id,
             last_login_at, created_at, updated_at
         FROM users
         WHERE subject = ?
@@ -122,6 +126,10 @@ public class UserDbService {
     user.setEmail(rs.getString("email"));
     user.setDisplayName(rs.getString("display_name"));
     user.setPictureUrl(rs.getString("picture_url"));
+    long companyId = rs.getLong("company_id");
+    if (!rs.wasNull()) {
+      user.setCompanyId(companyId);
+    }
     user.setLastLoginAt(toInstant(rs.getTimestamp("last_login_at")));
     user.setCreatedAt(toInstant(rs.getTimestamp("created_at")));
     user.setUpdatedAt(toInstant(rs.getTimestamp("updated_at")));

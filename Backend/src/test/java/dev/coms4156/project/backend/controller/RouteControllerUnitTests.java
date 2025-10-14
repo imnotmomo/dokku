@@ -4,12 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
+import dev.coms4156.project.backend.config.SecurityConfig;
+import dev.coms4156.project.backend.model.Company;
+import dev.coms4156.project.backend.service.db.CompanyDbService;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for RouteController.
@@ -17,10 +24,12 @@ import org.springframework.http.ResponseEntity;
 public class RouteControllerUnitTests {
 
   private RouteController controller;
+  private CompanyDbService companyDbService;
 
   @BeforeEach
   public void setUp() {
-    controller = new RouteController();
+    companyDbService = Mockito.mock(CompanyDbService.class);
+    controller = new RouteController(companyDbService);
   }
 
   @Test
@@ -231,14 +240,14 @@ public class RouteControllerUnitTests {
   }
 
   @Test
-  public void shouldNotContainScriptTags() {
+  public void shouldContainExpectedScriptOnly() {
     ResponseEntity<String> response = controller.index();
     String body = response.getBody();
 
     assertNotNull(body);
 
-    //should not contain any script tags (security)
-    assertFalse(body.toLowerCase().contains("<script"));
+    assertTrue(body.contains("<script>"));
+    assertFalse(body.contains("<script src"));
     assertFalse(body.toLowerCase().contains("javascript:"));
   }
 
@@ -254,6 +263,32 @@ public class RouteControllerUnitTests {
     assertFalse(body.toLowerCase().contains("secret"));
     assertFalse(body.toLowerCase().contains("key"));
     assertFalse(body.toLowerCase().contains("token"));
+  }
+
+  @Test
+  public void startLoginWithoutCompanyRedirectsToOAuth() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+
+    ResponseEntity<Void> response = controller.startLogin(null, null, request);
+
+    assertEquals(HttpStatus.FOUND, response.getStatusCode());
+    assertEquals("/oauth2/authorization/google", response.getHeaders().getLocation().toString());
+    HttpSession session = request.getSession(false);
+    assertNotNull(session);
+    assertFalse(session.getAttributeNames().hasMoreElements());
+  }
+
+  @Test
+  public void startLoginWithCompanyStoresId() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    when(companyDbService.findById(5L)).thenReturn(java.util.Optional.of(new Company()));
+
+    ResponseEntity<Void> response = controller.startLogin("true", 5L, request);
+
+    assertEquals(HttpStatus.FOUND, response.getStatusCode());
+    HttpSession session = request.getSession(false);
+    assertNotNull(session);
+    assertEquals(5L, session.getAttribute(SecurityConfig.SESSION_COMPANY_ID));
   }
 
   //helper method to count occurrences of a substring

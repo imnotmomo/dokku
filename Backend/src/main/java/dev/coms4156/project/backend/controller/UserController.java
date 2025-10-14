@@ -42,24 +42,27 @@ public class UserController {
     Optional<User> dbUser = userDbService.findBySubject(subject);
     if (dbUser.isPresent()) {
       User user = dbUser.get();
-      return ResponseEntity.ok(Map.of(
-          "subject", user.getSubject(),
-          "email", user.getEmail(),
-          "name", user.getDisplayName(),
-          "roles", user.getRoles()
-      ));
+      Map<String, Object> profile = new java.util.HashMap<>();
+      profile.put("subject", user.getSubject());
+      profile.put("email", user.getEmail());
+      profile.put("name", user.getDisplayName());
+      if (user.getCompanyId() != null) {
+        profile.put("companyId", user.getCompanyId());
+      }
+      profile.put("roles", user.getRoles());
+      return ResponseEntity.ok(profile);
     }
     String email = principal.getAttribute("email");
     String name = principal.getAttribute("name");
     Set<String> roles = principal.getAuthorities().stream()
         .map(auth -> auth.getAuthority())
         .collect(Collectors.toSet());
-    return ResponseEntity.ok(Map.of(
-        "subject", subject,
-        "email", email,
-        "name", name,
-        "roles", roles
-    ));
+    Map<String, Object> profile = new java.util.HashMap<>();
+    profile.put("subject", subject);
+    profile.put("email", email);
+    profile.put("name", name);
+    profile.put("roles", roles);
+    return ResponseEntity.ok(profile);
   }
 
   private String resolveSubject(OAuth2AuthenticatedPrincipal principal) {

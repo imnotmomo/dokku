@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +33,7 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import jakarta.servlet.http.HttpSession;
 
 /**
  * Security configuration enabling Google OAuth2 login and securing write operations.
@@ -40,6 +43,7 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 public class SecurityConfig {
 
   private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
+  public static final String SESSION_COMPANY_ID = "companyLogin.companyId";
   private final Set<String> adminEmails;
   private final UserDbService userDbService;
 
@@ -119,12 +123,16 @@ public class SecurityConfig {
       String email = user.getAttribute("email");
       String displayName = user.getAttribute("name");
       String pictureUrl = user.getAttribute("picture");
-      userDbService.upsertUser(subject, email, displayName, pictureUrl);
+      Long companyId = extractPendingCompanySelection();
+      userDbService.upsertUser(subject, email, displayName, pictureUrl, companyId);
 
       Set<String> storedRoles = userDbService.getRoles(subject);
       Set<String> effectiveRoles = new LinkedHashSet<>(storedRoles);
       if (!effectiveRoles.contains("USER")) {
         effectiveRoles.add("USER");
+      }
+      if (companyId != null) {
+        effectiveRoles.add("COMPANY");
       }
       if (logger.isInfoEnabled()) {
         logger.info("User logged in with email: {}", email);
@@ -146,5 +154,29 @@ public class SecurityConfig {
       }
       return new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo());
     };
+  }
+
+  private Long extractPendingCompanySelection() {
+    ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+    if (attrs == null) {
+      return null;
+    }
+    HttpSession session = attrs.getRequest().getSession(false);
+    if (session == null) {
+      return null;
+    }
+    Object value = session.getAttribute(SESSION_COMPANY_ID);
+    session.removeAttribute(SESSION_COMPANY_ID);
+    if (value instanceof Long l) {
+      return l;
+    }
+    if (value instanceof String s) {
+      try {
+        return Long.parseLong(s);
+      } catch (NumberFormatException ex) {
+        return null;
+      }
+    }
+    return null;
   }
 }
