@@ -68,7 +68,7 @@ public class RestroomController {
   /**
    * Submit a new restroom to the database.
    *
-   * @param restroom minimal restroom payload
+   * @param request minimal restroom payload
    * @return created restroom
    */
   @Operation(

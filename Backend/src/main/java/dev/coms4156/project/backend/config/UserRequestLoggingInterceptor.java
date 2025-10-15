@@ -144,7 +144,8 @@ public class UserRequestLoggingInterceptor implements HandlerInterceptor {
       }
     }
     if (logger.isInfoEnabled()) {
-      logger.info("API call sub={} display={} role={} type={} method={} uri={} status={} dur={} at={}",
+      logger.info(
+          "API call sub={} display={} role={} type={} method={} uri={} status={} dur={} at={}",
           userSubject,
           displaySubject,
           userRole,
