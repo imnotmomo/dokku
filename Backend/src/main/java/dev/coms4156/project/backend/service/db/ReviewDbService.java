@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Service;
  * Database service for Review entity.
  */
 @Service
-@Profile("!mock")
 public class ReviewDbService {
   private final JdbcTemplate jdbcTemplate;
   private final RestroomDbService restroomDbService;
@@ -36,12 +34,11 @@ public class ReviewDbService {
     String sql = """
         INSERT INTO review (restroom_id, user_id, rating, cleanliness, comment, helpful_votes)
         VALUES (?, ?, ?, ?, ?, ?)
-        RETURNING id, created_at
         """;
 
     KeyHolder keyHolder = new GeneratedKeyHolder();
     jdbcTemplate.update(connection -> {
-      PreparedStatement ps = connection.prepareStatement(sql, new String[] { "id", "created_at" });
+      PreparedStatement ps = connection.prepareStatement(sql, new String[] { "id" });
       ps.setLong(1, review.getRestroomId());
       ps.setString(2, review.getUserId());
       ps.setInt(3, review.getRating());
@@ -51,8 +48,17 @@ public class ReviewDbService {
       return ps;
     }, keyHolder);
 
-    review.setId(((Number) keyHolder.getKeys().get("id")).longValue());
-    review.setCreatedAt(((Timestamp) keyHolder.getKeys().get("created_at")).toInstant());
+    Number generatedId = keyHolder.getKey();
+    if (generatedId != null) {
+      review.setId(generatedId.longValue());
+      Timestamp createdAt = jdbcTemplate.queryForObject(
+          "SELECT created_at FROM review WHERE id = ?",
+          Timestamp.class,
+          review.getId());
+      if (createdAt != null) {
+        review.setCreatedAt(createdAt.toInstant());
+      }
+    }
 
     // Update restroom average rating
     updateRestroomRating(review.getRestroomId());
@@ -94,8 +100,10 @@ public class ReviewDbService {
   /**
    * Map database row to Review object.
    */
-  @SuppressWarnings("PMD.UnusedFormalParameter")
   private Review mapReview(ResultSet rs, int rowNum) throws SQLException {
+    if (rowNum < 0) {
+      throw new SQLException("Row index must not be negative");
+    }
     Review review = new Review();
     review.setId(rs.getLong("id"));
     review.setRestroomId(rs.getLong("restroom_id"));

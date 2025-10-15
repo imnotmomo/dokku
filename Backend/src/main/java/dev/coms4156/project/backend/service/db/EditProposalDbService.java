@@ -8,7 +8,6 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
  * Database service for EditProposal entity.
  */
 @Service
-@Profile("!mock")
 public class EditProposalDbService {
   private final JdbcTemplate jdbcTemplate;
 
@@ -38,12 +36,11 @@ public class EditProposalDbService {
           proposed_amenities, proposer_user_id, status
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
-        RETURNING id, created_at
         """;
 
     KeyHolder keyHolder = new GeneratedKeyHolder();
     jdbcTemplate.update(connection -> {
-      PreparedStatement ps = connection.prepareStatement(sql, new String[] { "id", "created_at" });
+      PreparedStatement ps = connection.prepareStatement(sql, new String[] { "id" });
       ps.setLong(1, proposal.getRestroomId());
       ps.setString(2, proposal.getProposedName());
       ps.setString(3, proposal.getProposedAddress());
@@ -54,8 +51,17 @@ public class EditProposalDbService {
       return ps;
     }, keyHolder);
 
-    proposal.setId(keyHolder.getKey().longValue());
-    proposal.setCreatedAt(((Timestamp) keyHolder.getKeys().get("created_at")).toInstant());
+    Number generatedId = keyHolder.getKey();
+    if (generatedId != null) {
+      proposal.setId(generatedId.longValue());
+      Timestamp createdAt = jdbcTemplate.queryForObject(
+          "SELECT created_at FROM edit_proposal WHERE id = ?",
+          Timestamp.class,
+          proposal.getId());
+      if (createdAt != null) {
+        proposal.setCreatedAt(createdAt.toInstant());
+      }
+    }
 
     return proposal;
   }
@@ -95,8 +101,10 @@ public class EditProposalDbService {
   /**
    * Map database row to EditProposal object.
    */
-  @SuppressWarnings("PMD.UnusedFormalParameter")
   private EditProposal mapEditProposal(ResultSet rs, int rowNum) throws SQLException {
+    if (rowNum < 0) {
+      throw new SQLException("Row index must not be negative");
+    }
     EditProposal proposal = new EditProposal();
     proposal.setId(rs.getLong("id"));
     proposal.setRestroomId(rs.getLong("restroom_id"));

@@ -3,20 +3,25 @@ package dev.coms4156.project.backend.service.db;
 import dev.coms4156.project.backend.model.User;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-
 /**
- * Database service for User entity.
+ * Database service for OAuth-backed users and their roles.
  */
 @Service
-@Profile("!mock")
 public class UserDbService {
+
   private final JdbcTemplate jdbcTemplate;
 
   @Autowired
@@ -25,79 +30,109 @@ public class UserDbService {
   }
 
   /**
-   * Create a new user.
+   * Create or update a user record from OAuth profile attributes.
    */
-  public User create(User user) {
+  public void upsertUser(String subject,
+                         String email,
+                         String displayName,
+                         String pictureUrl) {
+    if (subject == null || subject.isBlank()) {
+      throw new IllegalArgumentException("subject must not be blank");
+    }
+    int updated = jdbcTemplate.update("""
+        UPDATE users
+           SET email = ?,
+               display_name = ?,
+               picture_url = ?,
+               last_login_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE subject = ?
+        """,
+        email,
+        displayName,
+        pictureUrl,
+        subject);
+    if (updated == 0) {
+      jdbcTemplate.update("""
+          INSERT INTO users (subject, email, display_name, picture_url, last_login_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          """,
+          subject,
+          email,
+          displayName,
+          pictureUrl);
+    }
+  }
+
+  /**
+   * Replace all roles for a subject with the provided set (normalized to upper-case).
+   */
+  public void replaceRoles(String subject, Set<String> roles) {
+    jdbcTemplate.update("DELETE FROM user_roles WHERE subject = ?", subject);
+    if (roles == null || roles.isEmpty()) {
+      return;
+    }
+    Set<String> normalized = roles.stream()
+        .filter(role -> role != null && !role.isBlank())
+        .map(role -> role.toUpperCase(Locale.ROOT))
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (normalized.isEmpty()) {
+      return;
+    }
+    String insertSql = "INSERT INTO user_roles (subject, role) VALUES (?, ?)";
+    List<Object[]> params = normalized.stream()
+        .map(role -> new Object[]{subject, role})
+        .toList();
+    jdbcTemplate.batchUpdate(insertSql, params);
+  }
+
+  /**
+   * Fetch all roles for a subject.
+   */
+  public Set<String> getRoles(String subject) {
+    String sql = "SELECT role FROM user_roles WHERE subject = ? ORDER BY role ASC";
+    return new LinkedHashSet<>(jdbcTemplate.query(sql,
+        (rs, rowNum) -> rs.getString("role"),
+        subject));
+  }
+
+  /**
+   * Load a user, including roles.
+   */
+  public Optional<User> findBySubject(String subject) {
     String sql = """
-        INSERT INTO users (username, password, role, token, refresh_token)
-        VALUES (?, ?, ?, ?, ?)
+        SELECT subject, email, display_name, picture_url,
+            last_login_at, created_at, updated_at
+        FROM users
+        WHERE subject = ?
         """;
-
-    jdbcTemplate.update(sql,
-        user.getUsername(),
-        user.getPassword(),
-        user.getRole(),
-        user.getToken(),
-        user.getRefreshToken());
-
-    return user;
-  }
-
-  /**
-   * Find user by username.
-   */
-  public Optional<User> findByUsername(String username) {
-    String sql = "SELECT * FROM users WHERE username = ?";
     try {
-      return Optional.of(jdbcTemplate.queryForObject(sql, this::mapUser, username));
-    } catch (EmptyResultDataAccessException e) {
+      User user = jdbcTemplate.queryForObject(sql, this::mapUser, subject);
+      if (user != null) {
+        user.setRoles(getRoles(subject));
+      }
+      return Optional.ofNullable(user);
+    } catch (EmptyResultDataAccessException ex) {
       return Optional.empty();
     }
   }
 
-  /**
-   * Find user by token.
-   */
-  public Optional<User> findByToken(String token) {
-    String sql = "SELECT * FROM users WHERE token = ?";
-    try {
-      return Optional.of(jdbcTemplate.queryForObject(sql, this::mapUser, token));
-    } catch (EmptyResultDataAccessException e) {
-      return Optional.empty();
-    }
-  }
-
-  /**
-   * Find user by refresh token.
-   */
-  public Optional<User> findByRefreshToken(String refreshToken) {
-    String sql = "SELECT * FROM users WHERE refresh_token = ?";
-    try {
-      return Optional.of(jdbcTemplate.queryForObject(sql, this::mapUser, refreshToken));
-    } catch (EmptyResultDataAccessException e) {
-      return Optional.empty();
-    }
-  }
-
-  /**
-   * Update user's tokens.
-   */
-  public void updateTokens(String username, String newToken, String newRefreshToken) {
-    String sql = "UPDATE users SET token = ?, refresh_token = ? WHERE username = ?";
-    jdbcTemplate.update(sql, newToken, newRefreshToken, username);
-  }
-
-  /**
-   * Map database row to User object.
-   */
-  @SuppressWarnings("PMD.UnusedFormalParameter")
   private User mapUser(ResultSet rs, int rowNum) throws SQLException {
+    if (rowNum < 0) {
+      throw new SQLException("Row index must not be negative");
+    }
     User user = new User();
-    user.setUsername(rs.getString("username"));
-    user.setPassword(rs.getString("password"));
-    user.setRole(rs.getString("role"));
-    user.setToken(rs.getString("token"));
-    user.setRefreshToken(rs.getString("refresh_token"));
+    user.setSubject(rs.getString("subject"));
+    user.setEmail(rs.getString("email"));
+    user.setDisplayName(rs.getString("display_name"));
+    user.setPictureUrl(rs.getString("picture_url"));
+    user.setLastLoginAt(toInstant(rs.getTimestamp("last_login_at")));
+    user.setCreatedAt(toInstant(rs.getTimestamp("created_at")));
+    user.setUpdatedAt(toInstant(rs.getTimestamp("updated_at")));
     return user;
+  }
+
+  private Instant toInstant(Timestamp ts) {
+    return ts == null ? null : ts.toInstant();
   }
 }

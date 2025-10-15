@@ -2,13 +2,10 @@ package dev.coms4156.project.backend.controller;
 
 import dev.coms4156.project.backend.model.Review;
 import dev.coms4156.project.backend.model.ReviewRequest;
-import dev.coms4156.project.backend.service.MockApiService;
 import dev.coms4156.project.backend.service.db.RestroomDbService;
 import dev.coms4156.project.backend.service.db.ReviewDbService;
-import java.util.Arrays;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,43 +25,40 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/bathrooms/{id}/reviews")
 public class ReviewController {
 
-  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ROLE_MEMBER_EXPRESSION =
+      "hasAnyRole('USER','THIRD_PARTY_INTEGRATION','ADMIN')";
   private static final String ERROR_KEY = "error";
 
-  private final MockApiService mockService;
   private final ReviewDbService reviewDbService;
   private final RestroomDbService restroomDbService;
-  private final boolean useMock;
 
   /**
    * Constructor for DI.
    *
-   * @param mockService mock service implementation (optional)
    * @param reviewDbService review database service
    * @param restroomDbService restroom database service
-   * @param env Spring environment to check active profile
    */
   public ReviewController(
-      @Autowired(required = false) final MockApiService mockService,
-      @Autowired(required = false) final ReviewDbService reviewDbService,
-      @Autowired(required = false) final RestroomDbService restroomDbService,
-      final Environment env) {
-    this.mockService = mockService;
+      @Autowired final ReviewDbService reviewDbService,
+      @Autowired final RestroomDbService restroomDbService) {
     this.reviewDbService = reviewDbService;
     this.restroomDbService = restroomDbService;
-    this.useMock = mockService != null && Arrays.asList(env.getActiveProfiles()).contains("mock");
   }
 
   /**
    * Create a review (auth required).
    */
   @PostMapping
-  @PreAuthorize(ROLE_USER_EXPRESSION)
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> addReview(
       @PathVariable final Long id,
       @RequestBody final ReviewRequest body,
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     String reviewer = resolveUserIdentifier(principal);
+
+    if (reviewer == null || reviewer.isBlank()) {
+      return ResponseEntity.status(401).body(Map.of(ERROR_KEY, "Unable to resolve user subject"));
+    }
 
     if (body.getRating() == null || body.getCleanliness() == null) {
       return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "rating and cleanliness required"));
@@ -75,21 +69,16 @@ public class ReviewController {
     }
 
     try {
-      Review r;
-      if (useMock) {
-        r = mockService.addReview(id, reviewer, body.getRating(),
-            body.getCleanliness(), body.getComment());
-      } else {
-        // Create review using database service
-        Review review = new Review();
-        review.setRestroomId(id);
-        review.setUserId(reviewer);
-        review.setRating(body.getRating());
-        review.setCleanliness(body.getCleanliness());
-        review.setComment(body.getComment());
-        review.setHelpfulVotes(0);
-        r = reviewDbService.create(review);
-      }
+      restroomDbService.getById(id)
+          .orElseThrow(() -> new IllegalArgumentException("Restroom not found"));
+      Review review = new Review();
+      review.setRestroomId(id);
+      review.setUserId(reviewer);
+      review.setRating(body.getRating());
+      review.setCleanliness(body.getCleanliness());
+      review.setComment(body.getComment());
+      review.setHelpfulVotes(0);
+      Review r = reviewDbService.create(review);
       return ResponseEntity.status(201).body(r);
     } catch (Exception ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
@@ -104,14 +93,13 @@ public class ReviewController {
    * @return list of reviews
    */
   @GetMapping
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> list(@PathVariable final Long id,
                                 @RequestParam(defaultValue = "recent") final String sort) {
     try {
-      if (useMock) {
-        return ResponseEntity.ok(mockService.getReviews(id, sort));
-      } else {
-        return ResponseEntity.ok(reviewDbService.getByRestroomId(id, sort));
-      }
+      restroomDbService.getById(id)
+          .orElseThrow(() -> new IllegalArgumentException("Restroom not found"));
+      return ResponseEntity.ok(reviewDbService.getByRestroomId(id, sort));
     } catch (Exception ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
     }
@@ -119,12 +107,15 @@ public class ReviewController {
 
   private String resolveUserIdentifier(final OAuth2AuthenticatedPrincipal principal) {
     if (principal == null) {
-      return "anonymous";
+      return null;
     }
-    String email = principal.getAttribute("email");
-    if (email != null && !email.isBlank()) {
-      return email;
+    String subject = principal.getAttribute("sub");
+    if (subject == null || subject.isBlank()) {
+      subject = principal.getName();
     }
-    return principal.getName();
+    if ((subject == null || subject.isBlank()) && principal.getAttribute("email") != null) {
+      subject = principal.getAttribute("email");
+    }
+    return subject;
   }
 }
