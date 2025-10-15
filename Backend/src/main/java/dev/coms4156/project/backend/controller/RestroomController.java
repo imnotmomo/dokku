@@ -1,5 +1,7 @@
 package dev.coms4156.project.backend.controller;
 
+import dev.coms4156.project.backend.dto.RestroomCreateRequest;
+import dev.coms4156.project.backend.dto.RestroomEditProposalRequest;
 import dev.coms4156.project.backend.model.EditProposal;
 import dev.coms4156.project.backend.model.Restroom;
 import dev.coms4156.project.backend.service.db.EditProposalDbService;
@@ -39,7 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/bathrooms")
 public class RestroomController {
 
-  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ROLE_MEMBER_EXPRESSION =
+      "hasAnyRole('USER','THIRD_PARTY_INTEGRATION','ADMIN')";
   private static final String ERROR_KEY = "error";
 
   private final RestroomDbService restroomDbService;
@@ -78,27 +81,32 @@ public class RestroomController {
       @ApiResponse(responseCode = "400", description = "Invalid request payload")
   })
   @PostMapping
-  @PreAuthorize(ROLE_USER_EXPRESSION)
-  public ResponseEntity<Restroom> submit(@RequestBody final Restroom restroom) {
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
+  public ResponseEntity<?> submit(@RequestBody final RestroomCreateRequest request) {
+    if (request.getName() == null || request.getName().isBlank()
+        || request.getLatitude() == null || request.getLongitude() == null) {
+      return ResponseEntity.badRequest()
+          .body(Map.of(ERROR_KEY, "name, latitude, and longitude are required"));
+    }
     Restroom toCreate = new Restroom();
-    toCreate.setName(restroom.getName());
-    toCreate.setAddress(restroom.getAddress());
-    toCreate.setLatitude(restroom.getLatitude());
-    toCreate.setLongitude(restroom.getLongitude());
-    toCreate.setCompanyId(restroom.getCompanyId());
-    toCreate.setHours(restroom.getHours());
-    toCreate.setAmenities(restroom.getAmenities());
+    toCreate.setName(request.getName());
+    toCreate.setAddress(request.getAddress());
+    toCreate.setLatitude(request.getLatitude());
+    toCreate.setLongitude(request.getLongitude());
+    toCreate.setHours(request.getHours());
+    toCreate.setAmenities(request.getAmenities());
     Restroom saved = restroomDbService.create(toCreate);
     return ResponseEntity.status(201).body(saved);
   }
 
   /**
-   * Nearby search with optional filters.
+   * Nearby search with optional filters (auth required).
    */
   @Operation(
-      summary = "Find nearby restrooms, no login needed",
+      summary = "Find nearby restrooms, login required",
       description = "Returns restrooms filtered by radius, open status, amenities, and limit.")
   @GetMapping("/nearby")
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> nearby(@RequestParam final double lat,
                                   @RequestParam final double lng,
                                   @RequestParam(defaultValue = "1500") final double radius,
@@ -115,12 +123,13 @@ public class RestroomController {
   }
 
   /**
-   * Bathroom details with top helpful reviews preview.
+   * Bathroom details with top helpful reviews preview (auth required).
    */
   @Operation(
-      summary = "Get restroom details, no login needed",
+      summary = "Get restroom details, login required",
       description = "Fetches metadata and up to three helpful reviews for the restroom identifier.")
   @GetMapping("/{id}")
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> details(@PathVariable final Long id) {
     try {
       Restroom r = restroomDbService.getById(id)
@@ -131,8 +140,6 @@ public class RestroomController {
       dto.put("address", r.getAddress());
       dto.put("latitude", r.getLatitude());
       dto.put("longitude", r.getLongitude());
-      dto.put("companyId", r.getCompanyId());
-      dto.put("companyName", r.getCompanyName());
       dto.put("hours", r.getHours());
       dto.put("amenities", r.getAmenities());
       dto.put("avg_rating", r.getAvgRating());
@@ -152,24 +159,27 @@ public class RestroomController {
       summary = "Propose restroom edits",
       description = "Submit restroom edit suggestions, need a user token.")
   @PatchMapping("/{id}")
-  @PreAuthorize(ROLE_USER_EXPRESSION)
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> propose(
       @PathVariable final Long id,
-      @RequestBody final EditProposal p,
+      @RequestBody final RestroomEditProposalRequest request,
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {
     try {
       restroomDbService.getById(id)
           .orElseThrow(() -> new NoSuchElementException("Restroom not found"));
-      p.setRestroomId(id);
       String subject = resolveUserIdentifier(principal);
       if (subject == null || subject.isBlank()) {
         return ResponseEntity.status(401).body(Map.of(ERROR_KEY, "Unable to resolve user subject"));
       }
-      p.setProposerUserId(subject);
-      if (p.getStatus() == null || p.getStatus().isBlank()) {
-        p.setStatus("PENDING");
-      }
-      EditProposal created = editProposalDbService.create(p);
+      EditProposal proposal = new EditProposal();
+      proposal.setRestroomId(id);
+      proposal.setProposedName(request.getProposedName());
+      proposal.setProposedAddress(request.getProposedAddress());
+      proposal.setProposedHours(request.getProposedHours());
+      proposal.setProposedAmenities(request.getProposedAmenities());
+      proposal.setProposerUserId(subject);
+      proposal.setStatus("PENDING");
+      EditProposal created = editProposalDbService.create(proposal);
       return ResponseEntity.status(202).body(created);
     } catch (NoSuchElementException ex) {
       return ResponseEntity.status(404).body(Map.of(ERROR_KEY, ex.getMessage()));
@@ -183,7 +193,7 @@ public class RestroomController {
       summary = "Record a restroom visit",
       description = "Increments restroom visit counts, need a user token.")
   @PostMapping("/{id}/visit")
-  @PreAuthorize("hasRole('USER')")
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> visit(
       @PathVariable final Long id,
       @AuthenticationPrincipal final OAuth2AuthenticatedPrincipal principal) {

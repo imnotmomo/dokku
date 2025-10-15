@@ -20,16 +20,25 @@ public class RouteController {
   public ResponseEntity<String> index() {
     String body = """
         <p>Welcome!</p>
-        <p><a href='/oauth2/authorization/google'>Login with Google to manage restrooms or reviews</a></p>
-        <p>After logging in you can look up a company id via <code>/v1/companies?name=...</code> and POST to
-        <code>/v1/companies/{id}/assign</code> to become a company account.</p>
+        <p>
+          <a href='/oauth2/authorization/google'>
+            Login with Google to manage restrooms or reviews
+          </a>
+        </p>
+        <p>
+          After logging in you can look up a company id via
+          <code>/v1/companies?name=...</code> and POST to
+          <code>/v1/companies/{id}/assign</code> to become a company account.
+        </p>
         <p>Try the example query:
           <a href='/v1/bathrooms/nearby?lat=40.7536&amp;lng=-73.9832&amp;radius=2000'>
             GET /v1/bathrooms/nearby?lat=40.7536&amp;lng=-73.9832&amp;radius=2000
           </a>
         </p>
-        <p>If you're running with the <code>h2</code> profile, open the <a href='/h2-console'>H2 console</a> to inspect the
-        in-memory database.</p>
+        <p>
+          If you're running with the <code>h2</code> profile, open the
+          <a href='/h2-console'>H2 console</a> to inspect the in-memory database.
+        </p>
         <p>or visit <a href='/swagger-ui/index.html'>Swagger UI</a></p>
         """;
     return ResponseEntity.ok()

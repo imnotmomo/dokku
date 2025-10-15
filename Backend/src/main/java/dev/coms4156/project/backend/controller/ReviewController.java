@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/bathrooms/{id}/reviews")
 public class ReviewController {
 
-  private static final String ROLE_USER_EXPRESSION = "hasRole('USER')";
+  private static final String ROLE_MEMBER_EXPRESSION =
+      "hasAnyRole('USER','THIRD_PARTY_INTEGRATION','ADMIN')";
   private static final String ERROR_KEY = "error";
 
   private final ReviewDbService reviewDbService;
@@ -48,7 +49,7 @@ public class ReviewController {
    * Create a review (auth required).
    */
   @PostMapping
-  @PreAuthorize(ROLE_USER_EXPRESSION)
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> addReview(
       @PathVariable final Long id,
       @RequestBody final ReviewRequest body,
@@ -92,6 +93,7 @@ public class ReviewController {
    * @return list of reviews
    */
   @GetMapping
+  @PreAuthorize(ROLE_MEMBER_EXPRESSION)
   public ResponseEntity<?> list(@PathVariable final Long id,
                                 @RequestParam(defaultValue = "recent") final String sort) {
     try {

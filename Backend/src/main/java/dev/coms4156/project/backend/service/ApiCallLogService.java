@@ -21,14 +21,24 @@ public class ApiCallLogService {
    * Record an API invocation for auditing purposes.
    */
   public void record(String userSubject,
+                     String callType,
+                     String caller,
                      String httpMethod,
                      String requestedUrl,
                      int responseStatus,
                      long durationMs) {
     String sql = """
-        INSERT INTO api_call_log (user_subject, http_method, requested_url, response_status, duration_ms)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO api_call_log (user_subject, call_type, caller, http_method,
+                                  requested_url, response_status, duration_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """;
-    jdbcTemplate.update(sql, userSubject, httpMethod, requestedUrl, responseStatus, durationMs);
+    jdbcTemplate.update(sql,
+        userSubject,
+        callType,
+        caller,
+        httpMethod,
+        requestedUrl,
+        responseStatus,
+        durationMs);
   }
 }

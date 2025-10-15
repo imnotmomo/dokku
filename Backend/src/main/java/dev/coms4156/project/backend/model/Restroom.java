@@ -19,8 +19,6 @@ public class Restroom {
   private String address;
   private double latitude;
   private double longitude;
-  private Long companyId;
-  private String companyName;
   private String hoursJson;
   private List<String> amenities = new ArrayList<>();
   private double avgRating;
@@ -65,22 +63,6 @@ public class Restroom {
 
   public void setLongitude(final double longitude) {
     this.longitude = longitude;
-  }
-
-  public Long getCompanyId() {
-    return companyId;
-  }
-
-  public void setCompanyId(final Long companyId) {
-    this.companyId = companyId;
-  }
-
-  public String getCompanyName() {
-    return companyName;
-  }
-
-  public void setCompanyName(final String companyName) {
-    this.companyName = companyName;
   }
 
   public String getHours() {

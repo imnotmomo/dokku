@@ -1,5 +1,7 @@
 package dev.coms4156.project.backend.config;
 
+import dev.coms4156.project.backend.model.CompanyAccount;
+import dev.coms4156.project.backend.service.db.CompanyAccountDbService;
 import dev.coms4156.project.backend.service.db.UserDbService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -23,12 +26,9 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
-import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -45,46 +45,48 @@ public class SecurityConfig {
   private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
   private final Set<String> adminEmails;
   private final UserDbService userDbService;
-  private final HttpSessionOAuth2AuthorizationRequestRepository authorizationRequestRepository =
-      new HttpSessionOAuth2AuthorizationRequestRepository();
+  private final CompanyAccountDbService companyAccountDbService;
 
+  /**
+   * Create a security configuration with role and account services.
+   *
+   * @param adminEmailList comma-separated admin email addresses
+   * @param userDbService persistence service for OAuth users
+   * @param companyAccountDbService persistence service for third-party accounts
+   */
   public SecurityConfig(@Value("${app.admin.emails:}") final String adminEmailList,
-                        final UserDbService userDbService) {
+                        final UserDbService userDbService,
+                        final CompanyAccountDbService companyAccountDbService) {
     this.adminEmails = Arrays.stream(adminEmailList.split(","))
         .map(String::trim)
         .filter(s -> !s.isEmpty())
         .map(s -> s.toLowerCase(Locale.ROOT))
         .collect(Collectors.toSet());
     this.userDbService = userDbService;
+    this.companyAccountDbService = companyAccountDbService;
   }
 
+  /**
+   * Configure the security filter chain for the application.
+   *
+   * @param http the HTTP security builder
+   * @return configured security filter chain
+   * @throws Exception if Spring Security cannot be configured
+   */
   @Bean
-  SecurityFilterChain securityFilterChain(final HttpSecurity http,
-      final ClientRegistrationRepository clientRegistrationRepository) throws Exception {
-    CompanyAwareOAuth2AuthorizationRequestResolver resolver =
-        new CompanyAwareOAuth2AuthorizationRequestResolver(clientRegistrationRepository);
-    CompanyAwareAuthenticationSuccessHandler successHandler =
-        new CompanyAwareAuthenticationSuccessHandler(userDbService, authorizationRequestRepository);
-    successHandler.setDefaultTargetUrl("/");
-    successHandler.setAlwaysUseDefaultTargetUrl(true);
-
+  SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
     http
         .csrf(AbstractHttpConfigurer::disable)
         .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/", "/index").permitAll()
-            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
             .requestMatchers("/login", "/error", "/oauth2/**").permitAll()
-            .requestMatchers("/h2-console/**").permitAll()
-            .requestMatchers(HttpMethod.GET, "/v1/bathrooms/**").permitAll()
-            .requestMatchers(HttpMethod.GET, "/v1/companies/**").permitAll()
+            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").authenticated()
+            .requestMatchers("/h2-console/**").authenticated()
+            .requestMatchers("/v1/**").authenticated()
             .anyRequest().authenticated())
         .oauth2Login(oauth -> oauth
-            .authorizationEndpoint(auth -> auth
-                .authorizationRequestRepository(authorizationRequestRepository)
-                .authorizationRequestResolver(resolver))
             .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserService()))
-            .successHandler(successHandler)
             .failureHandler(authenticationFailureHandler()))
         .logout(logout -> logout.logoutSuccessUrl("/").permitAll());
     return http.build();
@@ -125,12 +127,16 @@ public class SecurityConfig {
       String pictureUrl = user.getAttribute("picture");
       userDbService.upsertUser(subject, email, displayName, pictureUrl);
 
+      Optional<CompanyAccount> accountOpt = companyAccountDbService.findBySubject(subject);
+      boolean approvedCompany = accountOpt.map(CompanyAccount::isApproved).orElse(false);
       Set<String> storedRoles = userDbService.getRoles(subject);
       Set<String> effectiveRoles = new LinkedHashSet<>(storedRoles);
-      if (!effectiveRoles.contains("USER")) {
+      if (approvedCompany) {
+        effectiveRoles.remove("USER");
+        effectiveRoles.add("THIRD_PARTY_INTEGRATION");
+      } else {
         effectiveRoles.add("USER");
       }
-      userDbService.findCompanyId(subject).ifPresent(id -> effectiveRoles.add("COMPANY"));
       if (logger.isInfoEnabled()) {
         logger.info("User logged in with email: {}", email);
         logger.info("Checking against admin emails: {}", adminEmails);

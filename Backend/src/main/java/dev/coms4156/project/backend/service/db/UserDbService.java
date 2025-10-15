@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -73,7 +74,7 @@ public class UserDbService {
     }
     Set<String> normalized = roles.stream()
         .filter(role -> role != null && !role.isBlank())
-        .map(role -> role.toUpperCase())
+        .map(role -> role.toUpperCase(Locale.ROOT))
         .collect(Collectors.toCollection(LinkedHashSet::new));
     if (normalized.isEmpty()) {
       return;
@@ -100,7 +101,7 @@ public class UserDbService {
    */
   public Optional<User> findBySubject(String subject) {
     String sql = """
-        SELECT subject, email, display_name, picture_url, company_id,
+        SELECT subject, email, display_name, picture_url,
             last_login_at, created_at, updated_at
         FROM users
         WHERE subject = ?
@@ -117,15 +118,14 @@ public class UserDbService {
   }
 
   private User mapUser(ResultSet rs, int rowNum) throws SQLException {
+    if (rowNum < 0) {
+      throw new SQLException("Row index must not be negative");
+    }
     User user = new User();
     user.setSubject(rs.getString("subject"));
     user.setEmail(rs.getString("email"));
     user.setDisplayName(rs.getString("display_name"));
     user.setPictureUrl(rs.getString("picture_url"));
-    long companyId = rs.getLong("company_id");
-    if (!rs.wasNull()) {
-      user.setCompanyId(companyId);
-    }
     user.setLastLoginAt(toInstant(rs.getTimestamp("last_login_at")));
     user.setCreatedAt(toInstant(rs.getTimestamp("created_at")));
     user.setUpdatedAt(toInstant(rs.getTimestamp("updated_at")));
@@ -134,38 +134,5 @@ public class UserDbService {
 
   private Instant toInstant(Timestamp ts) {
     return ts == null ? null : ts.toInstant();
-  }
-
-  /**
-   * Returns the company identifier linked to the user, if any.
-   */
-  public Optional<Long> findCompanyId(String subject) {
-    String sql = "SELECT company_id FROM users WHERE subject = ?";
-    try {
-      Long value = jdbcTemplate.queryForObject(sql, Long.class, subject);
-      return value == null ? Optional.empty() : Optional.of(value);
-    } catch (EmptyResultDataAccessException ex) {
-      return Optional.empty();
-    }
-  }
-
-  /**
-   * Assigns a company to the user and ensures the COMPANY role is present.
-   */
-  public void assignCompany(String subject, Long companyId) {
-    if (companyId == null) {
-      return;
-    }
-    jdbcTemplate.update("""
-        UPDATE users
-           SET company_id = ?,
-               updated_at = CURRENT_TIMESTAMP
-         WHERE subject = ?
-        """,
-        companyId,
-        subject);
-    Set<String> roles = new LinkedHashSet<>(getRoles(subject));
-    roles.add("COMPANY");
-    replaceRoles(subject, roles);
   }
 }
