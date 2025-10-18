@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk add --no-cache curl bash git openssh-client
 
-
+COPY Backend/ ./Backend/
 
 RUN chmod +x Backend/mvnw
 
