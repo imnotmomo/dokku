@@ -1,0 +1,26 @@
+name: Deploy to Dokku
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ID_RSA_DOKKU }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Skip host key checking for dokku.imfinethanku.me
+          echo -e "Host dokku.imfinethanku.me\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+
+      - name: Deploy via Dokku git:sync
+        run: |
+          ssh dokku@dokku.imfinethanku.me "dokku git:sync bathroom-v1 https://github.com/imnotmomo/dokku.git Database && dokku ps:rebuild bathroom-v1"
