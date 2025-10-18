@@ -22,4 +22,6 @@ jobs:
 
       - name: Deploy via Dokku git:sync
         run: |
-          ssh dokku@dokku.imfinethanku.me "dokku git:sync bathroom-v1 https://github.com/imnotmomo/dokku.git Database && dokku ps:rebuild bathroom-v1"
+# ssh dokku@dokku.imfinethanku.me "dokku git:sync bathroom-v1 https://github.com/imnotmomo/dokku.git Database && dokku ps:rebuild bathroom-v1"
+          ssh dokku@dokku.imfinethanku.me "dokku git:sync bathroom-v1 https://github.com/imnotmomo/dokku.git Database --build-dir backend && dokku ps:rebuild bathroom-v1"
+
